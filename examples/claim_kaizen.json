@@ -1,0 +1,178 @@
+{
+  "submitter": {
+    "id_qualifier": "ZZ",
+    "id": "KAIZENKZN01",
+    "name": "KAIZEN HEALTH",
+    "contact_name": "EDI Ops",
+    "contact_phone": "9735550100"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY & STATE",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "1234567893",
+    "tax_id": "111223333",
+    "taxonomy": "343900000X",
+    "name": "Kaizen Health, Inc.",
+    "address": {
+      "line1": "101 Main St",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    }
+  },
+  "subscriber": {
+    "relationship": "self",
+    "member_id": "KY123456789",
+    "name": {
+      "last": "Doe",
+      "first": "Jane"
+    },
+    "dob": "1990-08-14",
+    "sex": "F",
+    "address": {
+      "line1": "55 Oak Rd",
+      "city": "Frankfort",
+      "state": "KY",
+      "zip": "40601"
+    }
+  },
+  "claim": {
+    "clm_number": "KZN-2026-000001",
+    "total_charge": 85.0,
+    "pos": "41",
+    "icd10": [
+      "R99"
+    ],
+    "from": "2026-01-07",
+    "to": "2026-01-07",
+    "auth_number": "AUTH-777",
+    "payment_status": "P",
+    "tracking_number": "TRK-12345",
+    "patient_account": "ACCT-987",
+    "subscriber_internal_id": "SUB-INT-555",
+    "submission_channel": "ELECTRONIC",
+    "rendering_network_indicator": "I",
+    "ambulance": {
+      "patient_weight_lbs": 165,
+      "weight_unit": "LB",
+      "transport_code": "A",
+      "transport_reason": "DH",
+      "trip_number": 1,
+      "special_needs": false,
+      "attendant_type": "X",
+      "accompany_count": 1,
+      "pickup_indicator": "YM",
+      "requested_date": "2026-01-06",
+      "pickup": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      }
+    },
+    "supervising_provider": {
+      "last": "Smith",
+      "first": "Alex"
+    },
+    "member_group": {
+      "group_id": "KYCD",
+      "sub_group_id": "KY11",
+      "class_id": "KYRA",
+      "plan_id": "KYMANC",
+      "product_id": "KYMANC"
+    }
+  },
+  "services": [
+    {
+      "seq": 1,
+      "hcpcs": "A0130",
+      "modifiers": [
+        "EH"
+      ],
+      "units": 1,
+      "charge": 60.0,
+      "dos": "2026-01-07",
+      "emergency": false,
+      "pickup_loc_code": "RE",
+      "pickup_time": "1100",
+      "drop_loc_code": "DO",
+      "drop_time": "1130",
+      "trip_type": "I",
+      "trip_leg": "A",
+      "vas_indicator": false,
+      "transport_type": "WV",
+      "appointment_time": "1130",
+      "scheduled_pickup_time": "1100",
+      "trip_reason_code": "DO",
+      "arrive_time": "1055",
+      "depart_time": "1102",
+      "pickup": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      },
+      "payment_status": "P",
+      "adjudication": [
+        {
+          "paid_amount": 50.0,
+          "paid_units": 1,
+          "cas": [
+            {
+              "group": "CO",
+              "reason": "97",
+              "amount": 10.0,
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seq": 2,
+      "hcpcs": "A0200",
+      "modifiers": [
+        "EH"
+      ],
+      "units": 10,
+      "charge": 25.0,
+      "dos": "2026-01-07",
+      "emergency": false,
+      "pickup_loc_code": "DO",
+      "pickup_time": "1200",
+      "drop_loc_code": "RE",
+      "drop_time": "1230",
+      "trip_type": "R",
+      "trip_leg": "B",
+      "vas_indicator": false,
+      "transport_type": "WV",
+      "appointment_time": "0000",
+      "scheduled_pickup_time": "1200",
+      "trip_reason_code": "RE",
+      "arrive_time": "1157",
+      "depart_time": "1205",
+      "payment_status": "P",
+      "adjudication": [
+        {
+          "paid_amount": 20.0,
+          "paid_units": 10,
+          "cas": []
+        }
+      ]
+    }
+  ]
+}
