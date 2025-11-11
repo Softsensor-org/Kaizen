@@ -141,7 +141,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if clm.get("tracking_number"): w.segment("REF", "D9", clm["tracking_number"])
     if clm.get("patient_account"): w.segment("REF", "F8", clm["patient_account"])
 
-    # K3 occurrences: PYMS; SUB/IPAD/USER; SNWK; TRPN-ASPUFE*
+    # K3 occurrences: PYMS; SUB/IPAD/USER; SNWK; TRPN-ASPUFE*; DREC/DADJ/PAIDDT
     if clm.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{clm['payment_status']}")
     if clm.get("subscriber_internal_id") or clm.get("ip_address") or clm.get("user_id"):
         parts = []
@@ -153,6 +153,33 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if clm.get("submission_channel") in ("ELECTRONIC","PAPER"):
         tag = "ASPUFEELEC" if clm["submission_channel"]=="ELECTRONIC" else "ASPUFEPAPER"
         w.segment("K3", f"TRPN-{tag}")
+
+    # K3 - Date tracking (Kaizen requirement: DREC/DADJ/PAIDDT)
+    if clm.get("receipt_date") or clm.get("adjudication_date") or clm.get("paid_date"):
+        date_parts = []
+        if clm.get("receipt_date"): date_parts.append(f"DREC-{_fmt_d8(clm['receipt_date'])}")
+        if clm.get("adjudication_date"): date_parts.append(f"DADJ-{_fmt_d8(clm['adjudication_date'])}")
+        if clm.get("paid_date"): date_parts.append(f"PAIDDT-{_fmt_d8(clm['paid_date'])}")
+        w.segment("K3", ";".join(date_parts))
+
+    # K3 - Rendering Provider Address (Kaizen requirement: AL1/AL2 and CY/ST/ZIP)
+    rend = claim_json.get("rendering_provider", {})
+    if rend.get("address_line1") or rend.get("addr"):
+        addr1 = rend.get("address_line1") or rend.get("addr", "")
+        addr2 = rend.get("address_line2", "")
+        if addr1 or addr2:
+            addr_parts = []
+            if addr1: addr_parts.append(f"AL1-{addr1}")
+            if addr2: addr_parts.append(f"AL2-{addr2}")
+            w.segment("K3", ";".join(addr_parts))
+
+        # K3 - Rendering Provider City/State/Zip
+        if rend.get("city") or rend.get("state") or rend.get("zip"):
+            location_parts = []
+            if rend.get("city"): location_parts.append(f"CY-{rend['city']}")
+            if rend.get("state"): location_parts.append(f"ST-{rend['state']}")
+            if rend.get("zip"): location_parts.append(f"ZIP-{rend['zip']}")
+            w.segment("K3", ";".join(location_parts))
 
     # NTE member group structure
     group = clm.get("member_group", {})
@@ -170,7 +197,9 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     amb = clm.get("ambulance", {})
     if amb:
         # CR1: Ambulance Transport Information (proper X12 format)
-        w.segment("CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", amb.get("transport_code",""), amb.get("transport_reason",""))
+        # CR1-09 (Round Trip Purpose Description): Trip number zero-padded to 9 digits per Kaizen requirements
+        trip_num = str(amb.get("trip_number", "")).zfill(9) if amb.get("trip_number") else ""
+        w.segment("CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", "", amb.get("transport_code",""), amb.get("transport_reason",""), trip_num)
 
         # Trip details in NTE (custom UHC format - was incorrectly in CR1)
         trip = []
@@ -192,11 +221,59 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
             w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
 
+    # Loop 2310B - Rendering Provider (Claim Level)
+    rend = claim_json.get("rendering_provider", {})
+    if rend.get("npi") or rend.get("last") or rend.get("first"):
+        rend_name = rend.get("name", {})
+        if rend_name and isinstance(rend_name, dict):
+            last = rend_name.get("last", "")
+            first = rend_name.get("first", "")
+        else:
+            last = rend.get("last", "")
+            first = rend.get("first", "")
+
+        if rend.get("npi"):
+            # Provider with NPI
+            w.segment("NM1", "82", "1", last, first, "", "", "", "XX", rend["npi"])
+        else:
+            # Atypical provider without NPI
+            w.segment("NM1", "82", "1", last, first)
+
+        # REF*G2 - Atypical Provider ID (state Medicaid ID if no NPI)
+        if rend.get("atypical_id"):
+            w.segment("REF", "G2", rend["atypical_id"])
+
+        # REF*0B - Driver's License (Kaizen requirement for NEMT providers)
+        if rend.get("driver_license"):
+            w.segment("REF", "0B", rend["driver_license"])
+
+    # Loop 2310C - Service Facility Location (Claim Level)
+    svc_fac = clm.get("service_facility", {})
+    if svc_fac.get("name"):
+        w.segment("NM1", "77", "2", svc_fac["name"])
+        # REF*G2 - Facility secondary ID (state Medicaid ID)
+        if svc_fac.get("state_medicaid_id"):
+            w.segment("REF", "G2", svc_fac["state_medicaid_id"])
+
     # Loop 2310D - Supervising Provider (Claim Level)
     sup = clm.get("supervising_provider", {})
     if sup.get("last") or sup.get("first"):
-        w.segment("NM1", "DQ", "1", sup.get("last",""), sup.get("first",""))
-        if amb and amb.get("trip_number") is not None: w.segment("REF", "LU", str(amb["trip_number"]).zfill(9))
+        if sup.get("npi"):
+            w.segment("NM1", "DQ", "1", sup.get("last",""), sup.get("first",""), "", "", "", "XX", sup["npi"])
+        else:
+            w.segment("NM1", "DQ", "1", sup.get("last",""), sup.get("first",""))
+
+        # REF*G2 - Atypical Provider ID (if no NPI)
+        if sup.get("atypical_id"):
+            w.segment("REF", "G2", sup["atypical_id"])
+
+        # REF*0B - Driver's License (Kaizen requirement)
+        if sup.get("driver_license"):
+            w.segment("REF", "0B", sup["driver_license"])
+
+        # REF*LU - Trip number reference
+        if amb and amb.get("trip_number") is not None:
+            w.segment("REF", "LU", str(amb["trip_number"]).zfill(9))
 
     # Loop 2400 - Service Line
     for i, svc in enumerate(claim_json.get("services", []), 1):
@@ -239,7 +316,19 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         # Loop 2420D - Supervising Provider (Service Line Level)
         if svc.get("supervising_provider"):
             sp = svc["supervising_provider"]
-            w.segment("NM1", "DQ", "1", sp.get("last",""), sp.get("first",""))
+            if sp.get("npi"):
+                w.segment("NM1", "DQ", "1", sp.get("last",""), sp.get("first",""), "", "", "", "XX", sp["npi"])
+            else:
+                w.segment("NM1", "DQ", "1", sp.get("last",""), sp.get("first",""))
+
+            # REF*G2 - Atypical Provider ID (if no NPI)
+            if sp.get("atypical_id"):
+                w.segment("REF", "G2", sp["atypical_id"])
+
+            # REF*0B - Driver's License (Kaizen requirement)
+            if sp.get("driver_license"):
+                w.segment("REF", "0B", sp["driver_license"])
+
             # Trip number: use service-level if provided, otherwise cascade from claim-level
             trip_num = svc.get("trip_number")
             if trip_num is None and amb and amb.get("trip_number") is not None:
