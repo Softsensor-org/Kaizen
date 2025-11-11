@@ -10,6 +10,10 @@ from .validation import (
     PreSubmissionValidator, validate_claim_json,
     ValidationReport, ValidationIssue, ValidationSeverity
 )
+from .uhc_validator import (
+    UHCBusinessRuleValidator, validate_uhc_business_rules,
+    UHCReport, UHCRuleViolation, UHCRuleSeverity
+)
 from .codes import (
     POS_CODES, NEMT_HCPCS_CODES, HCPCS_MODIFIERS, FREQUENCY_CODES,
     TRANSPORT_CODES, TRANSPORT_REASON_CODES, WEIGHT_UNITS, GENDER_CODES,
@@ -25,6 +29,8 @@ __all__ = [
     "ComplianceReport", "ComplianceIssue", "Severity",
     "PreSubmissionValidator", "validate_claim_json",
     "ValidationReport", "ValidationIssue", "ValidationSeverity",
+    "UHCBusinessRuleValidator", "validate_uhc_business_rules",
+    "UHCReport", "UHCRuleViolation", "UHCRuleSeverity",
     "POS_CODES", "NEMT_HCPCS_CODES", "HCPCS_MODIFIERS", "FREQUENCY_CODES",
     "TRANSPORT_CODES", "TRANSPORT_REASON_CODES", "WEIGHT_UNITS", "GENDER_CODES",
     "TRIP_TYPES", "TRIP_LEGS", "NETWORK_INDICATORS", "SUBMISSION_CHANNELS",
