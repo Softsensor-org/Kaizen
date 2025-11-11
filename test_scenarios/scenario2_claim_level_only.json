@@ -1,0 +1,157 @@
+{
+  "submitter": {
+    "name": "Kaizen Health",
+    "id": "KAIZENKZN01",
+    "contact_name": "EDI Ops",
+    "contact_phone": "9735550100"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY & STATE",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "1234567893",
+    "name": "Kaizen Health, Inc.",
+    "address": {
+      "line1": "101 Main St",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    },
+    "tax_id": "111223333",
+    "taxonomy": "343900000X"
+  },
+  "subscriber": {
+    "member_id": "KY123456789",
+    "name": {
+      "last": "Doe",
+      "first": "Jane"
+    },
+    "address": {
+      "line1": "55 Oak Rd",
+      "city": "Frankfort",
+      "state": "KY",
+      "zip": "40601"
+    },
+    "dob": "1990-08-14",
+    "sex": "F"
+  },
+  "claim": {
+    "clm_number": "SCENARIO2-001",
+    "total_charge": 85.00,
+    "from": "2026-01-07",
+    "to": "2026-01-07",
+    "pos": "41",
+    "frequency_code": "1",
+    "icd10": ["R99"],
+    "auth_number": "AUTH-777",
+    "tracking_number": "TRK-SCEN2",
+    "patient_account": "ACCT-SCEN2",
+    "payment_status": "P",
+    "rendering_network_indicator": "I",
+    "submission_channel": "ELECTRONIC",
+    "ambulance": {
+      "weight_unit": "LB",
+      "patient_weight_lbs": 165,
+      "transport_code": "A",
+      "transport_reason": "DH",
+      "trip_number": 100002,
+      "special_needs": false,
+      "attendant_type": "X",
+      "accompany_count": 1,
+      "pickup_indicator": "YM",
+      "requested_date": "2026-01-06",
+      "pickup": {
+        "addr": "55 Oak Rd (CLAIM LEVEL)",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Dr (CLAIM LEVEL)",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      }
+    },
+    "member_group": {
+      "group_id": "KYCD",
+      "sub_group_id": "KY11",
+      "class_id": "KYRA",
+      "plan_id": "KYMANC",
+      "product_id": "KYMANC"
+    },
+    "supervising_provider": {
+      "last": "Smith",
+      "first": "Alex"
+    }
+  },
+  "services": [
+    {
+      "hcpcs": "A0130",
+      "modifiers": ["EH"],
+      "charge": 60.00,
+      "units": 1,
+      "dos": "2026-01-07",
+      "pos": "41",
+      "emergency": false,
+      "pickup_loc_code": "RE",
+      "pickup_time": "1100",
+      "drop_loc_code": "DO",
+      "drop_time": "1130",
+      "trip_type": "I",
+      "trip_leg": "A",
+      "vas_indicator": false,
+      "transport_type": "WV",
+      "appointment_time": "1130",
+      "scheduled_pickup_time": "1100",
+      "trip_reason_code": "DO",
+      "arrive_time": "1055",
+      "depart_time": "1102",
+      "payment_status": "P",
+      "adjudication": [
+        {
+          "paid_amount": 50.00,
+          "paid_units": 1,
+          "cas": [
+            {
+              "group": "CO",
+              "reason": "97",
+              "amount": 10.00,
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "hcpcs": "A0200",
+      "modifiers": ["EH"],
+      "charge": 25.00,
+      "units": 10,
+      "dos": "2026-01-07",
+      "pos": "41",
+      "emergency": false,
+      "pickup_loc_code": "DO",
+      "pickup_time": "1200",
+      "drop_loc_code": "RE",
+      "drop_time": "1230",
+      "trip_type": "R",
+      "trip_leg": "B",
+      "vas_indicator": false,
+      "transport_type": "WV",
+      "appointment_time": "0000",
+      "scheduled_pickup_time": "1200",
+      "trip_reason_code": "RE",
+      "arrive_time": "1157",
+      "depart_time": "1205",
+      "payment_status": "P",
+      "adjudication": [
+        {
+          "paid_amount": 20.00,
+          "paid_units": 10
+        }
+      ]
+    }
+  ]
+}
