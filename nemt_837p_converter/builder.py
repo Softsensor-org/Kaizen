@@ -357,7 +357,8 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     for i, svc in enumerate(claim_json.get("services", []), 1):
         w.segment("LX", str(i))
         hc_comp = ":".join(["HC", svc["hcpcs"]] + list(svc.get("modifiers", [])))
-        w.segment("SV1", hc_comp, f"{float(svc.get('charge',0.0)):.2f}", "UN", str(svc.get("units",1)), "", "", _pos(svc.get("pos", pos)), "", "", _yesno(svc.get("emergency")) or "")
+        # SV101-09: procedure, charge, unit, quantity, POS (SV105-06 empty), composite dx pointer (SV107 empty), monetary (SV108 empty), emergency (SV109)
+        w.segment("SV1", hc_comp, f"{float(svc.get('charge',0.0)):.2f}", "UN", str(svc.get("units",1)), "", "", _pos(svc.get("pos", pos)), "", _yesno(svc.get("emergency")) or "")
         dos = svc.get("dos") or from_d
         if dos: w.segment("DTP", "472", "D8", _fmt_d8(dos))
 
