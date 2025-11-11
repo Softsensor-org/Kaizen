@@ -14,6 +14,10 @@ from .uhc_validator import (
     UHCBusinessRuleValidator, validate_uhc_business_rules,
     UHCReport, UHCRuleViolation, UHCRuleSeverity
 )
+from .batch import (
+    BatchProcessor, process_batch,
+    BatchReport, BatchIssue, BatchSeverity, BatchConfig
+)
 from .codes import (
     POS_CODES, NEMT_HCPCS_CODES, HCPCS_MODIFIERS, FREQUENCY_CODES,
     TRANSPORT_CODES, TRANSPORT_REASON_CODES, WEIGHT_UNITS, GENDER_CODES,
@@ -31,6 +35,8 @@ __all__ = [
     "ValidationReport", "ValidationIssue", "ValidationSeverity",
     "UHCBusinessRuleValidator", "validate_uhc_business_rules",
     "UHCReport", "UHCRuleViolation", "UHCRuleSeverity",
+    "BatchProcessor", "process_batch",
+    "BatchReport", "BatchIssue", "BatchSeverity", "BatchConfig",
     "POS_CODES", "NEMT_HCPCS_CODES", "HCPCS_MODIFIERS", "FREQUENCY_CODES",
     "TRANSPORT_CODES", "TRANSPORT_REASON_CODES", "WEIGHT_UNITS", "GENDER_CODES",
     "TRIP_TYPES", "TRIP_LEGS", "NETWORK_INDICATORS", "SUBMISSION_CHANNELS",
