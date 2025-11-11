@@ -5,7 +5,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(python -m nemt_837p_converter:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(python -m pytest:*)"
     ],
     "deny": [],
     "ask": []

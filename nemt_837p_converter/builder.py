@@ -95,8 +95,11 @@ def validate_claim_json(claim_json: dict):
     elif len(str(clm["clm_number"])) > 30:
         errors.append(f"claim.clm_number must be ≤30 characters, got {len(str(clm['clm_number']))}")
 
-    if not clm.get("total_charge"):
+    # Allow 0 for void claims (frequency_code 8)
+    if clm.get("total_charge") is None:
         errors.append("claim.total_charge is required")
+    elif clm.get("total_charge") == 0 and clm.get("frequency_code") != "8":
+        errors.append("claim.total_charge must be > 0 (or use frequency_code=8 for void claims)")
 
     if not clm.get("from"):
         errors.append("claim.from date is required")
@@ -148,14 +151,18 @@ def validate_claim_json(claim_json: dict):
     if not claim_json.get("services"):
         errors.append("At least one service is required")
     else:
+        is_void_claim = clm.get("frequency_code") == "8"
         for i, svc in enumerate(claim_json["services"], 1):
             if not svc.get("hcpcs"):
                 errors.append(f"services[{i}].hcpcs is required")
             elif len(svc["hcpcs"]) > 5:
                 errors.append(f"services[{i}].hcpcs must be ≤5 characters")
 
-            if not svc.get("charge"):
+            # Allow 0 charge for void claims
+            if svc.get("charge") is None:
                 errors.append(f"services[{i}].charge is required")
+            elif svc.get("charge") == 0 and not is_void_claim:
+                errors.append(f"services[{i}].charge must be > 0 (or use frequency_code=8 for void claims)")
 
             if svc.get("modifiers"):
                 if len(svc["modifiers"]) > 4:

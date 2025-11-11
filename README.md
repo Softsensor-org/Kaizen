@@ -153,3 +153,61 @@ Validation Error: billing_provider.npi must be 10 digits, got: 123; billing_prov
 - Consistent payer data across claims
 - Supports multi-payer environments
 - Reduces configuration errors
+
+## P2 Production Readiness Features
+
+### 6. Frequency Code Workflow Documentation
+- **Comprehensive guide** - See [FREQUENCY_CODES.md](FREQUENCY_CODES.md)
+- **Supports all frequency types:**
+  - `1` - Original claim (first submission)
+  - `6` - Corrected claim (minor corrections)
+  - `7` - Replacement claim (full replacement)
+  - `8` - Void/cancel claim
+- **Workflow examples** - Original → Replacement → Void scenarios
+- **Best practices** - Claim number management, tracking, testing
+- **Alternative format** - Support `adjustment_type` field (`"replacement"`, `"void"`)
+- **Validation** - Allow zero charges for void claims (frequency_code=8)
+
+### 7. Claim Enrichment Agent
+- **Auto-populate defaults** - Automatically fill missing optional fields
+- **Data cascading** - Cascade data from claim to service level
+- **Smart defaults:**
+  - `pos` defaults to "41" (Ambulance Land)
+  - `frequency_code` defaults to "1" (Original)
+  - `to` date defaults to `from` date
+  - Service `dos` defaults to claim `from` date
+  - Service `pos` defaults to claim `pos`
+  - Service `units` defaults to 1
+  - Service `emergency` defaults to False
+- **Cascading features:**
+  - `trip_number` from claim.ambulance to services
+  - `payment_status` from claim to services
+  - `pickup/dropoff` from claim.ambulance to services
+- **Flexible usage:**
+  - CLI: `--enrich` flag
+  - API: `enrich_claim(data)` function
+  - Custom defaults: `enrich_claim(data, defaults={"pos": "42"})`
+  - In-place modification: `enrich_claim(data, in_place=True)`
+
+**Example:**
+```bash
+# Auto-populate optional fields before conversion
+python -m nemt_837p_converter claim.json --out out.edi --enrich ...
+```
+
+### 8. Comprehensive Test Suite
+- **37 test cases** - Full coverage of validation, enrichment, and EDI generation
+- **Test categories:**
+  - Validation tests (12 tests) - Field validation, code values, formats
+  - Enrichment tests (15 tests) - Default values, cascading, in-place
+  - Builder tests (11 tests) - EDI structure, segments, frequency codes
+- **Test fixtures** - Valid, minimal, invalid, replacement, void claims
+- **Run tests:** `pytest tests/ -v`
+- **Coverage:** Core functionality, edge cases, error handling
+- **Continuous testing** - Easy to add new tests for new features
+
+**Run tests:**
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```

@@ -3,6 +3,7 @@ import argparse, json, sys
 from .builder import build_837p_from_json, Config, ValidationError
 from .x12 import ControlNumbers
 from .payers import get_payer_config, list_payers
+from .enrichment import enrich_claim
 
 def main():
     p = argparse.ArgumentParser(description="Convert Kaizen NEMT JSON to 837P EDI (Availity/UHC).")
@@ -17,6 +18,7 @@ def main():
     p.add_argument("--gs-receiver", help="GS03 (App Receiver Code)")
     p.add_argument("--payer", help="Payer key (e.g., UHC_CS, UHC_KY) or leave blank to use receiver data from JSON")
     p.add_argument("--list-payers", action="store_true", help="List available payer configurations and exit")
+    p.add_argument("--enrich", action="store_true", help="Auto-populate optional fields with defaults before conversion")
     args = p.parse_args()
 
     if args.list_payers:
@@ -39,6 +41,10 @@ def main():
 
     with open(args.json_path, "r") as f:
         data = json.load(f)
+
+    # Enrich claim data if requested
+    if args.enrich:
+        data = enrich_claim(data)
 
     # Get payer configuration if specified
     payer_config = None
