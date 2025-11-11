@@ -1,3 +1,3 @@
-from .builder import build_837p_from_json, Config
+from .builder import build_837p_from_json, Config, ValidationError
 from .x12 import ControlNumbers
-__all__ = ["build_837p_from_json", "Config", "ControlNumbers"]
+__all__ = ["build_837p_from_json", "Config", "ControlNumbers", "ValidationError"]

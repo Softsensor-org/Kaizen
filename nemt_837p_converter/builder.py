@@ -1,6 +1,74 @@
 # SPDX-License-Identifier: MIT
 import datetime
+import re
 from .x12 import X12Writer, ControlNumbers
+
+class ValidationError(Exception):
+    """Raised when input JSON validation fails"""
+    pass
+
+def validate_claim_json(claim_json: dict):
+    """Validate required fields and basic formats in claim JSON"""
+    errors = []
+
+    # Required top-level keys
+    for key in ["submitter", "receiver", "billing_provider", "subscriber", "claim"]:
+        if key not in claim_json:
+            errors.append(f"Missing required top-level key: {key}")
+
+    if errors:
+        raise ValidationError("; ".join(errors))
+
+    # Validate billing provider
+    bp = claim_json["billing_provider"]
+    if not bp.get("npi"):
+        errors.append("billing_provider.npi is required")
+    elif not re.match(r'^\d{10}$', str(bp["npi"])):
+        errors.append(f"billing_provider.npi must be 10 digits, got: {bp['npi']}")
+
+    if not bp.get("name"):
+        errors.append("billing_provider.name is required")
+
+    if "address" not in bp:
+        errors.append("billing_provider.address is required")
+    elif not all(k in bp["address"] for k in ["line1", "city", "state", "zip"]):
+        errors.append("billing_provider.address must have line1, city, state, zip")
+
+    # Validate subscriber
+    subr = claim_json["subscriber"]
+    if not subr.get("member_id"):
+        errors.append("subscriber.member_id is required")
+
+    if "name" not in subr or not subr["name"].get("last") or not subr["name"].get("first"):
+        errors.append("subscriber.name.last and subscriber.name.first are required")
+
+    # Validate claim
+    clm = claim_json["claim"]
+    if not clm.get("clm_number"):
+        errors.append("claim.clm_number is required")
+    elif len(str(clm["clm_number"])) > 30:
+        errors.append(f"claim.clm_number must be ≤30 characters, got {len(str(clm['clm_number']))}")
+
+    if not clm.get("total_charge"):
+        errors.append("claim.total_charge is required")
+
+    if not clm.get("from"):
+        errors.append("claim.from date is required")
+    elif not re.match(r'^\d{4}-\d{2}-\d{2}$', clm["from"]):
+        errors.append(f"claim.from must be in YYYY-MM-DD format, got: {clm['from']}")
+
+    # Validate services
+    if not claim_json.get("services"):
+        errors.append("At least one service is required")
+    else:
+        for i, svc in enumerate(claim_json["services"], 1):
+            if not svc.get("hcpcs"):
+                errors.append(f"services[{i}].hcpcs is required")
+            if not svc.get("charge"):
+                errors.append(f"services[{i}].charge is required")
+
+    if errors:
+        raise ValidationError("; ".join(errors))
 
 class Config:
     def __init__(self, sender_qual="ZZ", sender_id="SENDERID", receiver_qual="ZZ", receiver_id="RECEIVERID",
@@ -27,6 +95,9 @@ def _yesno(v):
     return "Y" if str(v).lower() in ("y","yes","true","1") else "N"
 
 def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = None) -> str:
+    # Validate input before processing
+    validate_claim_json(claim_json)
+
     if cn is None: cn = ControlNumbers()
     w = X12Writer(component_sep=cfg.component_sep)
     now = datetime.datetime.now()
@@ -120,11 +191,13 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         ]
         w.segment("NTE", "ADD", ";".join(nte))
 
-    # Ambulance/NEMT claim-level CR1 and CR109
+    # Ambulance/NEMT claim-level CR1
     amb = clm.get("ambulance", {})
     if amb:
-        c1 = ["CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", amb.get("transport_code",""), amb.get("transport_reason","")]
-        w.extend(w.element_sep.join(c1) + w.segment_term)
+        # CR1: Ambulance Transport Information (proper X12 format)
+        w.segment("CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", amb.get("transport_code",""), amb.get("transport_reason",""))
+
+        # Trip details in NTE (custom UHC format - was incorrectly in CR1)
         trip = []
         if amb.get("trip_number") is not None: trip.append(f"TRIPNUM-{str(amb['trip_number']).zfill(9)}")
         if amb.get("special_needs") is not None: trip.append(f"SPECNEED-{_yesno(amb['special_needs'])}")
@@ -132,7 +205,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if amb.get("accompany_count") is not None: trip.append(f"ACCOMP-{amb['accompany_count']}")
         if amb.get("pickup_indicator"): trip.append(f"PICKUP-{amb['pickup_indicator']}")
         if amb.get("requested_date"): trip.append(f"TRIPREQ-{_fmt_d8(amb['requested_date'])}")
-        if trip: w.segment("CR1", "", "", "", "", "", "", "", ";".join(trip))
+        if trip: w.segment("NTE", "ADD", ";".join(trip))
         if amb.get("pickup"):
             w.segment("NM1", "PW", "2"); w.segment("N3", amb["pickup"].get("addr",""))
             w.segment("N4", amb["pickup"].get("city",""), amb["pickup"].get("state",""), amb["pickup"].get("zip",""))
@@ -161,28 +234,34 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if svc.get("drop_time"): nte_parts.append(f"DOTIME-{svc['drop_time']}")
         if nte_parts: w.segment("NTE", "ADD", ";".join(nte_parts))
 
-        # 2400 CR109 and CR110 strings
-        cr109 = []
-        if svc.get("trip_type"): cr109.append(f"TRIPTYPE-{svc['trip_type']}")
-        if svc.get("trip_leg"): cr109.append(f"TRIPLEG-{svc['trip_leg']}")
-        if svc.get("vas_indicator") is not None: cr109.append(f"VAS-{_yesno(svc['vas_indicator'])}")
-        if svc.get("transport_type"): cr109.append(f"TRANTYPE-{svc['transport_type']}")
-        if svc.get("appointment_time"): cr109.append(f"APPTTIME-{svc['appointment_time']}")
-        if svc.get("scheduled_pickup_time"): cr109.append(f"SCHPUTIME-{svc['scheduled_pickup_time']}")
-        if svc.get("trip_reason_code") is not None: cr109.append(f"TRIPRSN-{svc['trip_reason_code']}")
-        if cr109: w.segment("CR1", "", "", "", "", "", "", "", ";".join(cr109))
-        cr110 = []
-        if svc.get("arrive_time"): cr110.append(f"ARRIVTIME-{svc['arrive_time']}")
-        if svc.get("depart_time"): cr110.append(f"DEPRTTIME-{svc['depart_time']}")
-        if svc.get("drop_loc_code"): cr110.append(f"DOLOC-{svc['drop_loc_code']}")
-        if svc.get("drop_time"): cr110.append(f"DOTIME-{svc['drop_time']}")
-        if cr110: w.segment("CR1", "", "", "", "", "", "", "", "", ";".join(cr110))
+        # Service-level trip details in NTE (custom UHC format - was incorrectly in CR1)
+        # Trip type, leg, VAS, transport details
+        trip_details = []
+        if svc.get("trip_type"): trip_details.append(f"TRIPTYPE-{svc['trip_type']}")
+        if svc.get("trip_leg"): trip_details.append(f"TRIPLEG-{svc['trip_leg']}")
+        if svc.get("vas_indicator") is not None: trip_details.append(f"VAS-{_yesno(svc['vas_indicator'])}")
+        if svc.get("transport_type"): trip_details.append(f"TRANTYPE-{svc['transport_type']}")
+        if svc.get("appointment_time"): trip_details.append(f"APPTTIME-{svc['appointment_time']}")
+        if svc.get("scheduled_pickup_time"): trip_details.append(f"SCHPUTIME-{svc['scheduled_pickup_time']}")
+        if svc.get("trip_reason_code") is not None: trip_details.append(f"TRIPRSN-{svc['trip_reason_code']}")
+        if trip_details: w.segment("NTE", "ADD", ";".join(trip_details))
+
+        # Arrival/departure times in separate NTE (avoid redundancy with earlier DOLOC/DOTIME)
+        time_details = []
+        if svc.get("arrive_time"): time_details.append(f"ARRIVTIME-{svc['arrive_time']}")
+        if svc.get("depart_time"): time_details.append(f"DEPRTTIME-{svc['depart_time']}")
+        if time_details: w.segment("NTE", "ADD", ";".join(time_details))
 
         # Supervising provider at line (2420D) and REF*LU Trip Number
         if svc.get("supervising_provider"):
             sp = svc["supervising_provider"]
             w.segment("NM1", "DQ", "1", sp.get("last",""), sp.get("first",""))
-            if svc.get("trip_number") is not None: w.segment("REF", "LU", str(svc["trip_number"]).zfill(9))
+            # Trip number: use service-level if provided, otherwise cascade from claim-level
+            trip_num = svc.get("trip_number")
+            if trip_num is None and amb and amb.get("trip_number") is not None:
+                trip_num = amb["trip_number"]
+            if trip_num is not None:
+                w.segment("REF", "LU", str(trip_num).zfill(9))
 
         # 2420G/H pickup & drop-off
         if svc.get("pickup"):

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 import argparse, json, sys
-from .builder import build_837p_from_json, Config
+from .builder import build_837p_from_json, Config, ValidationError
 from .x12 import ControlNumbers
 
 def main():
@@ -23,7 +23,12 @@ def main():
                  receiver_qual=args.receiver_qual, receiver_id=args.receiver_id,
                  usage_indicator=args.usage, gs_sender_code=args.gs_sender, gs_receiver_code=args.gs_receiver)
 
-    edi = build_837p_from_json(data, cfg, ControlNumbers())
+    try:
+        edi = build_837p_from_json(data, cfg, ControlNumbers())
+    except ValidationError as e:
+        print(f"Validation Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
     if args.out == "-" or args.out == "/dev/stdout":
         sys.stdout.write(edi)
     else:
