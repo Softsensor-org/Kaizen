@@ -2,13 +2,20 @@
 import datetime
 import re
 from .x12 import X12Writer, ControlNumbers
+from .codes import (
+    POS_CODES, NEMT_HCPCS_CODES, HCPCS_MODIFIERS, FREQUENCY_CODES,
+    TRANSPORT_CODES, TRANSPORT_REASON_CODES, WEIGHT_UNITS, GENDER_CODES,
+    TRIP_TYPES, TRIP_LEGS, NETWORK_INDICATORS, SUBMISSION_CHANNELS,
+    PAYMENT_STATUS_CODES, validate_code, validate_state, validate_zip
+)
+from .payers import get_payer_config
 
 class ValidationError(Exception):
     """Raised when input JSON validation fails"""
     pass
 
 def validate_claim_json(claim_json: dict):
-    """Validate required fields and basic formats in claim JSON"""
+    """Validate required fields, formats, and code values in claim JSON"""
     errors = []
 
     # Required top-level keys
@@ -28,19 +35,58 @@ def validate_claim_json(claim_json: dict):
 
     if not bp.get("name"):
         errors.append("billing_provider.name is required")
+    elif len(bp["name"]) > 60:
+        errors.append(f"billing_provider.name must be ≤60 characters, got {len(bp['name'])}")
 
     if "address" not in bp:
         errors.append("billing_provider.address is required")
-    elif not all(k in bp["address"] for k in ["line1", "city", "state", "zip"]):
-        errors.append("billing_provider.address must have line1, city, state, zip")
+    else:
+        addr = bp["address"]
+        if not all(k in addr for k in ["line1", "city", "state", "zip"]):
+            errors.append("billing_provider.address must have line1, city, state, zip")
+        else:
+            if len(addr["line1"]) > 55:
+                errors.append(f"billing_provider.address.line1 must be ≤55 characters")
+            if len(addr["city"]) > 30:
+                errors.append(f"billing_provider.address.city must be ≤30 characters")
+            err = validate_state(addr["state"], "billing_provider.address.state")
+            if err: errors.append(err)
+            err = validate_zip(addr["zip"], "billing_provider.address.zip")
+            if err: errors.append(err)
+
+    if bp.get("tax_id") and not re.match(r'^\d{9}$', str(bp["tax_id"]).replace("-", "")):
+        errors.append(f"billing_provider.tax_id must be 9 digits, got: {bp['tax_id']}")
 
     # Validate subscriber
     subr = claim_json["subscriber"]
     if not subr.get("member_id"):
         errors.append("subscriber.member_id is required")
+    elif len(subr["member_id"]) > 80:
+        errors.append(f"subscriber.member_id must be ≤80 characters")
 
     if "name" not in subr or not subr["name"].get("last") or not subr["name"].get("first"):
         errors.append("subscriber.name.last and subscriber.name.first are required")
+    else:
+        if len(subr["name"]["last"]) > 60:
+            errors.append(f"subscriber.name.last must be ≤60 characters")
+        if len(subr["name"]["first"]) > 35:
+            errors.append(f"subscriber.name.first must be ≤35 characters")
+
+    if subr.get("dob") and not re.match(r'^\d{4}-\d{2}-\d{2}$', subr["dob"]):
+        errors.append(f"subscriber.dob must be in YYYY-MM-DD format, got: {subr['dob']}")
+
+    if subr.get("sex"):
+        err = validate_code(subr["sex"], GENDER_CODES, "subscriber.sex")
+        if err: errors.append(err)
+
+    if "address" in subr:
+        addr = subr["address"]
+        if addr.get("state"):
+            err = validate_state(addr["state"], "subscriber.address.state")
+            if err: errors.append(err)
+        if addr.get("zip"):
+            err = validate_zip(addr["zip"], "subscriber.address.zip")
+            if err: errors.append(err)
 
     # Validate claim
     clm = claim_json["claim"]
@@ -57,6 +103,47 @@ def validate_claim_json(claim_json: dict):
     elif not re.match(r'^\d{4}-\d{2}-\d{2}$', clm["from"]):
         errors.append(f"claim.from must be in YYYY-MM-DD format, got: {clm['from']}")
 
+    if clm.get("to") and not re.match(r'^\d{4}-\d{2}-\d{2}$', clm["to"]):
+        errors.append(f"claim.to must be in YYYY-MM-DD format, got: {clm['to']}")
+
+    if clm.get("pos"):
+        err = validate_code(clm["pos"], POS_CODES, "claim.pos")
+        if err: errors.append(err)
+
+    if clm.get("frequency_code"):
+        err = validate_code(clm["frequency_code"], FREQUENCY_CODES, "claim.frequency_code")
+        if err: errors.append(err)
+
+    if clm.get("payment_status"):
+        err = validate_code(clm["payment_status"], PAYMENT_STATUS_CODES, "claim.payment_status")
+        if err: errors.append(err)
+
+    if clm.get("rendering_network_indicator"):
+        err = validate_code(clm["rendering_network_indicator"], NETWORK_INDICATORS, "claim.rendering_network_indicator")
+        if err: errors.append(err)
+
+    if clm.get("submission_channel"):
+        err = validate_code(clm["submission_channel"], SUBMISSION_CHANNELS, "claim.submission_channel")
+        if err: errors.append(err)
+
+    # Validate ambulance data
+    if clm.get("ambulance"):
+        amb = clm["ambulance"]
+        if amb.get("weight_unit"):
+            err = validate_code(amb["weight_unit"], WEIGHT_UNITS, "claim.ambulance.weight_unit")
+            if err: errors.append(err)
+
+        if amb.get("transport_code"):
+            err = validate_code(amb["transport_code"], TRANSPORT_CODES, "claim.ambulance.transport_code")
+            if err: errors.append(err)
+
+        if amb.get("transport_reason"):
+            err = validate_code(amb["transport_reason"], TRANSPORT_REASON_CODES, "claim.ambulance.transport_reason")
+            if err: errors.append(err)
+
+        if amb.get("requested_date") and not re.match(r'^\d{4}-\d{2}-\d{2}$', amb["requested_date"]):
+            errors.append(f"claim.ambulance.requested_date must be in YYYY-MM-DD format")
+
     # Validate services
     if not claim_json.get("services"):
         errors.append("At least one service is required")
@@ -64,15 +151,45 @@ def validate_claim_json(claim_json: dict):
         for i, svc in enumerate(claim_json["services"], 1):
             if not svc.get("hcpcs"):
                 errors.append(f"services[{i}].hcpcs is required")
+            elif len(svc["hcpcs"]) > 5:
+                errors.append(f"services[{i}].hcpcs must be ≤5 characters")
+
             if not svc.get("charge"):
                 errors.append(f"services[{i}].charge is required")
+
+            if svc.get("modifiers"):
+                if len(svc["modifiers"]) > 4:
+                    errors.append(f"services[{i}].modifiers: maximum 4 modifiers allowed")
+                for mod in svc["modifiers"]:
+                    if len(mod) > 2:
+                        errors.append(f"services[{i}].modifiers: modifier '{mod}' must be ≤2 characters")
+
+            if svc.get("pos"):
+                err = validate_code(svc["pos"], POS_CODES, f"services[{i}].pos")
+                if err: errors.append(err)
+
+            if svc.get("dos") and not re.match(r'^\d{4}-\d{2}-\d{2}$', svc["dos"]):
+                errors.append(f"services[{i}].dos must be in YYYY-MM-DD format")
+
+            if svc.get("trip_type"):
+                err = validate_code(svc["trip_type"], TRIP_TYPES, f"services[{i}].trip_type")
+                if err: errors.append(err)
+
+            if svc.get("trip_leg"):
+                err = validate_code(svc["trip_leg"], TRIP_LEGS, f"services[{i}].trip_leg")
+                if err: errors.append(err)
+
+            if svc.get("payment_status"):
+                err = validate_code(svc["payment_status"], PAYMENT_STATUS_CODES, f"services[{i}].payment_status")
+                if err: errors.append(err)
 
     if errors:
         raise ValidationError("; ".join(errors))
 
 class Config:
     def __init__(self, sender_qual="ZZ", sender_id="SENDERID", receiver_qual="ZZ", receiver_id="RECEIVERID",
-                 usage_indicator="T", gs_sender_code="SENDER", gs_receiver_code="RECEIVER", component_sep=":"):
+                 usage_indicator="T", gs_sender_code="SENDER", gs_receiver_code="RECEIVER", component_sep=":",
+                 payer_config=None):
         self.sender_qual = sender_qual
         self.sender_id = sender_id
         self.receiver_qual = receiver_qual
@@ -81,6 +198,7 @@ class Config:
         self.gs_sender_code = gs_sender_code
         self.gs_receiver_code = gs_receiver_code
         self.component_sep = component_sep
+        self.payer_config = payer_config  # PayerConfig object for payer-specific settings
 
 def _fmt_d8(s):
     if not s: return None
@@ -102,6 +220,17 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     w = X12Writer(component_sep=cfg.component_sep)
     now = datetime.datetime.now()
 
+    # Get payer configuration
+    recv = claim_json["receiver"]
+    if cfg.payer_config:
+        payer = cfg.payer_config
+    else:
+        # Get payer config from receiver data, or use default
+        payer = get_payer_config(
+            payer_id=recv.get("payer_id"),
+            payer_name=recv.get("payer_name")
+        )
+
     isa_cn = cn.next_isa(); gs_cn = cn.next_gs(); st_cn = cn.next_st()
     w.build_ISA(cfg.sender_qual, cfg.sender_id, cfg.receiver_qual, cfg.receiver_id, cfg.usage_indicator, isa_cn, now, now, "00501")
     w.build_GS("HC", cfg.gs_sender_code, cfg.gs_receiver_code, now, now, gs_cn, "005010X222A1")
@@ -120,8 +249,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         w.segment("PER", "IC", subm.get("contact_name",""), "TE", subm.get("contact_phone",""))
 
     # 1000B Receiver
-    recv = claim_json["receiver"]
-    w.segment("NM1", "40", "2", recv.get("payer_name","RECEIVER"), "", "", "", "", "46", cfg.receiver_id)
+    w.segment("NM1", "40", "2", payer.payer_name or recv.get("payer_name","RECEIVER"), "", "", "", "", "46", cfg.receiver_id)
 
     # 2000A Billing Provider
     w.segment("HL", "1", "", "20", "1")
@@ -144,7 +272,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         w.segment("N4", subr["address"]["city"], subr["address"]["state"], subr["address"]["zip"])
     if subr.get("dob") or subr.get("sex"):
         w.segment("DMG", "D8", _fmt_d8(subr.get("dob","")), subr.get("sex",""))
-    w.segment("NM1", "PR", "2", recv.get("payer_name","UNITED HEALTHCARE"), "", "", "", "", "PI", recv.get("payer_id","87726"))
+    w.segment("NM1", "PR", "2", payer.payer_name, "", "", "", "", payer.default_qualifier, payer.payer_id)
 
     # 2300 Claim
     pos = _pos(clm.get("pos","41"))
@@ -278,7 +406,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         for adj in svc.get("adjudication", []):
             paid = f"{float(adj.get('paid_amount',0.0)):.2f}"
             svd05 = str(adj.get("paid_units","")) if adj.get("paid_units") is not None else ""
-            w.segment("SVD", recv.get("payer_id","87726"), paid, hc_comp, "", svd05)
+            w.segment("SVD", payer.payer_id, paid, hc_comp, "", svd05)
             for cas in adj.get("cas", []):
                 w.segment("CAS", cas.get("group","CO"), cas.get("reason",""), f"{float(cas.get('amount',0.0)):.2f}", str(cas.get("quantity","")))
 

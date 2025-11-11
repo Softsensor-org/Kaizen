@@ -17,6 +17,18 @@ Implements Kaizen encounter requirements for UHC C&S:
 ## Installation & Run
 ```bash
 cd nemt_837p_converter
+
+# List available payer configurations
+python -m nemt_837p_converter --list-payers
+
+# Convert with specific payer configuration
+python -m nemt_837p_converter examples/claim_kaizen.json --out out.edi \
+  --sender-qual ZZ --sender-id KAIZENKZN01 \
+  --receiver-qual ZZ --receiver-id 030240928 \
+  --usage T --gs-sender KAIZENKZN01 --gs-receiver 030240928 \
+  --payer UHC_CS
+
+# Or use payer data from JSON (omit --payer argument)
 python -m nemt_837p_converter examples/claim_kaizen.json --out out.edi \
   --sender-qual ZZ --sender-id KAIZENKZN01 \
   --receiver-qual ZZ --receiver-id 030240928 \
@@ -25,33 +37,61 @@ python -m nemt_837p_converter examples/claim_kaizen.json --out out.edi \
 
 ## Input Validation
 
-The converter validates all required fields before generating EDI. Validation errors will be displayed with specific field paths.
+The converter performs comprehensive validation before generating EDI, including:
+- **Required fields** - Ensures all mandatory data is present
+- **Format validation** - Validates dates (YYYY-MM-DD), NPIs (10 digits), ZIP codes, etc.
+- **Length validation** - Enforces X12 element length limits
+- **Code value validation** - Validates against standard code sets
 
 ### Required Fields:
 
 **Billing Provider:**
 - `billing_provider.npi` (must be 10 digits)
-- `billing_provider.name`
-- `billing_provider.address` (line1, city, state, zip)
+- `billing_provider.name` (max 60 characters)
+- `billing_provider.address.line1` (max 55 characters)
+- `billing_provider.address.city` (max 30 characters)
+- `billing_provider.address.state` (valid US state code)
+- `billing_provider.address.zip` (format: 12345 or 12345-6789)
+- `billing_provider.tax_id` (9 digits, optional)
 
 **Subscriber:**
-- `subscriber.member_id`
-- `subscriber.name.last`
-- `subscriber.name.first`
+- `subscriber.member_id` (max 80 characters)
+- `subscriber.name.last` (max 60 characters)
+- `subscriber.name.first` (max 35 characters)
+- `subscriber.dob` (format: YYYY-MM-DD, optional)
+- `subscriber.sex` (F/M/U, optional)
 
 **Claim:**
 - `claim.clm_number` (max 30 characters)
 - `claim.total_charge`
 - `claim.from` (format: YYYY-MM-DD)
+- `claim.to` (format: YYYY-MM-DD, optional)
+- `claim.pos` (valid Place of Service code, optional)
+- `claim.frequency_code` (1/6/7/8, optional)
 
 **Services:**
 - At least one service required
-- `services[].hcpcs`
+- `services[].hcpcs` (max 5 characters)
 - `services[].charge`
+- `services[].modifiers` (max 4 modifiers, 2 characters each, optional)
+- `services[].dos` (format: YYYY-MM-DD, optional)
+
+### Validated Code Values:
+
+- **Place of Service (POS)** - 41 (Ambulance Land), 42 (Ambulance Air/Water), etc.
+- **Transport Codes** - A, B, C, D, E
+- **Transport Reason** - A, B, C, D, DH, E
+- **Weight Units** - LB, KG
+- **Gender** - F, M, U
+- **Trip Types** - I (Initial), R (Return), B (Both)
+- **Trip Legs** - A, B
+- **Network Indicators** - I (In-network), O (Out-of-network)
+- **Payment Status** - P (Paid), D (Denied)
+- **Submission Channels** - ELECTRONIC, PAPER
 
 ### Example Validation Error:
 ```
-Validation Error: billing_provider.npi must be 10 digits, got: 123; claim.from must be in YYYY-MM-DD format, got: 01/07/2026
+Validation Error: billing_provider.npi must be 10 digits, got: 123; billing_provider.address.state 'XX' is not a valid US state code; claim.ambulance.transport_code 'Z' is not a valid code. Valid values: A, B, C, D, E
 ```
 
 ## P0 Fixes Applied
@@ -71,3 +111,45 @@ Validation Error: billing_provider.npi must be 10 digits, got: 123; claim.from m
 - Required field checks
 - Format validation (NPI, dates, claim number length)
 - Prevents invalid EDI generation
+
+## P1 Enhancements Applied
+
+### 4. Comprehensive Field Validation
+- **Code value validation** - Validates against standard X12 code sets
+  - Place of Service codes (POS 41, 42, etc.)
+  - Transport codes (A, B, C, D, E)
+  - Transport reason codes (A, B, C, D, DH, E)
+  - Gender codes (F, M, U)
+  - Trip types, legs, network indicators
+  - Weight units (LB, KG)
+  - Payment status (P, D)
+- **Length validation** - Enforces X12 element length limits
+  - Provider names, addresses
+  - Subscriber names
+  - HCPCS codes, modifiers
+- **Format validation** - Extended to cover
+  - State codes (US states)
+  - ZIP codes (12345 or 12345-6789)
+  - Tax ID (9 digits)
+  - Date formats (YYYY-MM-DD)
+- **Business rule validation**
+  - Max 4 modifiers per service
+  - Modifier length (2 characters)
+  - HCPCS code length (5 characters)
+
+### 5. Payer Configuration System
+- **Externalized payer data** - No more hardcoded payer IDs
+- **Predefined payer configurations:**
+  - `UHC_CS` - United Healthcare Community & State (ID: 87726)
+  - `UHC_KY` - United Healthcare Kentucky (ID: 87726)
+  - `AVAILITY` - Availity (ID: 030240928)
+- **CLI support** - `--payer UHC_CS` or use JSON receiver data
+- **List payers** - `--list-payers` command shows available configs
+- **Flexible configuration** - Can use predefined or custom payer data
+- **Automatic fallback** - Uses receiver data from JSON if no payer specified
+
+**Benefits:**
+- Easy to add new payers without code changes
+- Consistent payer data across claims
+- Supports multi-payer environments
+- Reduces configuration errors
