@@ -246,19 +246,20 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
 
     clm = claim_json["claim"]
 
-    # BHT
+    # Transaction Set Header
+    # BHT - Beginning of Hierarchical Transaction
     w.segment("BHT", "0019", "00", (clm.get("clm_number") or "REF")[:30], now.strftime("%Y%m%d"), now.strftime("%H%M"), "CH")
 
-    # 1000A Submitter
+    # Loop 1000A - Submitter Name
     subm = claim_json["submitter"]
     w.segment("NM1", "41", "2", subm.get("name",""), "", "", "", "", subm.get("id_qualifier","ZZ"), subm.get("id") or subm.get("sender_id",""))
     if subm.get("contact_name") or subm.get("contact_phone"):
         w.segment("PER", "IC", subm.get("contact_name",""), "TE", subm.get("contact_phone",""))
 
-    # 1000B Receiver
+    # Loop 1000B - Receiver Name
     w.segment("NM1", "40", "2", payer.payer_name or recv.get("payer_name","RECEIVER"), "", "", "", "", "46", cfg.receiver_id)
 
-    # 2000A Billing Provider
+    # Loop 2000A - Billing Provider Hierarchical Level
     w.segment("HL", "1", "", "20", "1")
     bp = claim_json["billing_provider"]
     w.segment("NM1", "85", "2", bp["name"], "", "", "", "", "XX", bp["npi"])
@@ -267,7 +268,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if bp.get("tax_id"): w.segment("REF", "EI", bp["tax_id"])
     if bp.get("taxonomy"): w.segment("PRV", "BI", "PXC", bp["taxonomy"])
 
-    # 2000B Subscriber
+    # Loop 2000B - Subscriber Hierarchical Level
     w.segment("HL", "2", "1", "22", "0")
     sbr_rel = "18" if claim_json["subscriber"].get("relationship","self") == "self" else "01"
     w.segment("SBR", "P", sbr_rel, "", "", "", "", "", "MC")
@@ -281,7 +282,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         w.segment("DMG", "D8", _fmt_d8(subr.get("dob","")), subr.get("sex",""))
     w.segment("NM1", "PR", "2", payer.payer_name, "", "", "", "", payer.default_qualifier, payer.payer_id)
 
-    # 2300 Claim
+    # Loop 2300 - Claim Information
     pos = _pos(clm.get("pos","41"))
     freq = clm.get("frequency_code") or ("8" if clm.get("adjustment_type")=="void" else ("7" if clm.get("adjustment_type")=="replacement" else "1"))
     clm05 = w.composite(pos, "B", freq)
@@ -341,19 +342,24 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if amb.get("pickup_indicator"): trip.append(f"PICKUP-{amb['pickup_indicator']}")
         if amb.get("requested_date"): trip.append(f"TRIPREQ-{_fmt_d8(amb['requested_date'])}")
         if trip: w.segment("NTE", "ADD", ";".join(trip))
+
+        # Loop 2310E - Ambulance Pick-up Location (Claim Level)
         if amb.get("pickup"):
             w.segment("NM1", "PW", "2"); w.segment("N3", amb["pickup"].get("addr",""))
             w.segment("N4", amb["pickup"].get("city",""), amb["pickup"].get("state",""), amb["pickup"].get("zip",""))
+
+        # Loop 2310F - Ambulance Drop-off Location (Claim Level)
         if amb.get("dropoff"):
             w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
             w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
 
+    # Loop 2310D - Supervising Provider (Claim Level)
     sup = clm.get("supervising_provider", {})
     if sup.get("last") or sup.get("first"):
         w.segment("NM1", "DQ", "1", sup.get("last",""), sup.get("first",""))
         if amb and amb.get("trip_number") is not None: w.segment("REF", "LU", str(amb["trip_number"]).zfill(9))
 
-    # 2400 Service lines
+    # Loop 2400 - Service Line
     for i, svc in enumerate(claim_json.get("services", []), 1):
         w.segment("LX", str(i))
         hc_comp = ":".join(["HC", svc["hcpcs"]] + list(svc.get("modifiers", [])))
@@ -362,7 +368,7 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         dos = svc.get("dos") or from_d
         if dos: w.segment("DTP", "472", "D8", _fmt_d8(dos))
 
-        # 2400 NTE for locations & times
+        # NTE segments for NEMT-specific location and time data (2400 level)
         nte_parts = []
         if svc.get("pickup_loc_code"): nte_parts.append(f"PULOC-{svc['pickup_loc_code']}")
         if svc.get("pickup_time"): nte_parts.append(f"PUTIME-{svc['pickup_time']}")
@@ -388,10 +394,10 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if svc.get("depart_time"): time_details.append(f"DEPRTTIME-{svc['depart_time']}")
         if time_details: w.segment("NTE", "ADD", ";".join(time_details))
 
-        # Line-level PYMS (must be at 2400 level, before 2420 provider loops)
+        # K3 - Line-level payment status (must be at 2400 level, before 2420 provider loops)
         if svc.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{svc['payment_status']}")
 
-        # Supervising provider at line (2420D) and REF*LU Trip Number
+        # Loop 2420D - Supervising Provider (Service Line Level)
         if svc.get("supervising_provider"):
             sp = svc["supervising_provider"]
             w.segment("NM1", "DQ", "1", sp.get("last",""), sp.get("first",""))
@@ -402,15 +408,17 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             if trip_num is not None:
                 w.segment("REF", "LU", str(trip_num).zfill(9))
 
-        # 2420G/H pickup & drop-off
+        # Loop 2420G - Ambulance Pick-up Location (Service Line Level)
         if svc.get("pickup"):
             w.segment("NM1", "PW", "2"); w.segment("N3", svc["pickup"].get("addr",""))
             w.segment("N4", svc["pickup"].get("city",""), svc["pickup"].get("state",""), svc["pickup"].get("zip",""))
+
+        # Loop 2420H - Ambulance Drop-off Location (Service Line Level)
         if svc.get("dropoff"):
             w.segment("NM1", "45", "2"); w.segment("N3", svc["dropoff"].get("addr",""))
             w.segment("N4", svc["dropoff"].get("city",""), svc["dropoff"].get("state",""), svc["dropoff"].get("zip",""))
 
-        # 2430 adjudication (SVD + CAS)
+        # Loop 2430 - Line Adjudication Information
         for adj in svc.get("adjudication", []):
             paid = f"{float(adj.get('paid_amount',0.0)):.2f}"
             svd05 = str(adj.get("paid_units","")) if adj.get("paid_units") is not None else ""
