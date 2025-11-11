@@ -9,189 +9,28 @@ from .codes import (
     PAYMENT_STATUS_CODES, validate_code, validate_state, validate_zip
 )
 from .payers import get_payer_config
+from .validation import validate_claim_json as _validate_with_agent1, ValidationReport
 
 class ValidationError(Exception):
     """Raised when input JSON validation fails"""
     pass
 
 def validate_claim_json(claim_json: dict):
-    """Validate required fields, formats, and code values in claim JSON"""
-    errors = []
+    """
+    Validate required fields, formats, and code values in claim JSON
 
-    # Required top-level keys
-    for key in ["submitter", "receiver", "billing_provider", "subscriber", "claim"]:
-        if key not in claim_json:
-            errors.append(f"Missing required top-level key: {key}")
+    Uses Agent 1 (Pre-Submission Validator) with backward-compatible exception raising.
 
-    if errors:
-        raise ValidationError("; ".join(errors))
+    Raises:
+        ValidationError: If validation fails with error-level issues
+    """
+    # Use Agent 1 for validation
+    report = _validate_with_agent1(claim_json)
 
-    # Validate billing provider
-    bp = claim_json["billing_provider"]
-    if not bp.get("npi"):
-        errors.append("billing_provider.npi is required")
-    elif not re.match(r'^\d{10}$', str(bp["npi"])):
-        errors.append(f"billing_provider.npi must be 10 digits, got: {bp['npi']}")
-
-    if not bp.get("name"):
-        errors.append("billing_provider.name is required")
-    elif len(bp["name"]) > 60:
-        errors.append(f"billing_provider.name must be ≤60 characters, got {len(bp['name'])}")
-
-    if "address" not in bp:
-        errors.append("billing_provider.address is required")
-    else:
-        addr = bp["address"]
-        if not all(k in addr for k in ["line1", "city", "state", "zip"]):
-            errors.append("billing_provider.address must have line1, city, state, zip")
-        else:
-            if len(addr["line1"]) > 55:
-                errors.append(f"billing_provider.address.line1 must be ≤55 characters")
-            if len(addr["city"]) > 30:
-                errors.append(f"billing_provider.address.city must be ≤30 characters")
-            err = validate_state(addr["state"], "billing_provider.address.state")
-            if err: errors.append(err)
-            err = validate_zip(addr["zip"], "billing_provider.address.zip")
-            if err: errors.append(err)
-
-    if bp.get("tax_id") and not re.match(r'^\d{9}$', str(bp["tax_id"]).replace("-", "")):
-        errors.append(f"billing_provider.tax_id must be 9 digits, got: {bp['tax_id']}")
-
-    # Validate subscriber
-    subr = claim_json["subscriber"]
-    if not subr.get("member_id"):
-        errors.append("subscriber.member_id is required")
-    elif len(subr["member_id"]) > 80:
-        errors.append(f"subscriber.member_id must be ≤80 characters")
-
-    if "name" not in subr or not subr["name"].get("last") or not subr["name"].get("first"):
-        errors.append("subscriber.name.last and subscriber.name.first are required")
-    else:
-        if len(subr["name"]["last"]) > 60:
-            errors.append(f"subscriber.name.last must be ≤60 characters")
-        if len(subr["name"]["first"]) > 35:
-            errors.append(f"subscriber.name.first must be ≤35 characters")
-
-    if subr.get("dob") and not re.match(r'^\d{4}-\d{2}-\d{2}$', subr["dob"]):
-        errors.append(f"subscriber.dob must be in YYYY-MM-DD format, got: {subr['dob']}")
-
-    if subr.get("sex"):
-        err = validate_code(subr["sex"], GENDER_CODES, "subscriber.sex")
-        if err: errors.append(err)
-
-    if "address" in subr:
-        addr = subr["address"]
-        if addr.get("state"):
-            err = validate_state(addr["state"], "subscriber.address.state")
-            if err: errors.append(err)
-        if addr.get("zip"):
-            err = validate_zip(addr["zip"], "subscriber.address.zip")
-            if err: errors.append(err)
-
-    # Validate claim
-    clm = claim_json["claim"]
-    if not clm.get("clm_number"):
-        errors.append("claim.clm_number is required")
-    elif len(str(clm["clm_number"])) > 30:
-        errors.append(f"claim.clm_number must be ≤30 characters, got {len(str(clm['clm_number']))}")
-
-    # Allow 0 for void claims (frequency_code 8)
-    if clm.get("total_charge") is None:
-        errors.append("claim.total_charge is required")
-    elif clm.get("total_charge") == 0 and clm.get("frequency_code") != "8":
-        errors.append("claim.total_charge must be > 0 (or use frequency_code=8 for void claims)")
-
-    if not clm.get("from"):
-        errors.append("claim.from date is required")
-    elif not re.match(r'^\d{4}-\d{2}-\d{2}$', clm["from"]):
-        errors.append(f"claim.from must be in YYYY-MM-DD format, got: {clm['from']}")
-
-    if clm.get("to") and not re.match(r'^\d{4}-\d{2}-\d{2}$', clm["to"]):
-        errors.append(f"claim.to must be in YYYY-MM-DD format, got: {clm['to']}")
-
-    if clm.get("pos"):
-        err = validate_code(clm["pos"], POS_CODES, "claim.pos")
-        if err: errors.append(err)
-
-    if clm.get("frequency_code"):
-        err = validate_code(clm["frequency_code"], FREQUENCY_CODES, "claim.frequency_code")
-        if err: errors.append(err)
-
-    if clm.get("payment_status"):
-        err = validate_code(clm["payment_status"], PAYMENT_STATUS_CODES, "claim.payment_status")
-        if err: errors.append(err)
-
-    if clm.get("rendering_network_indicator"):
-        err = validate_code(clm["rendering_network_indicator"], NETWORK_INDICATORS, "claim.rendering_network_indicator")
-        if err: errors.append(err)
-
-    if clm.get("submission_channel"):
-        err = validate_code(clm["submission_channel"], SUBMISSION_CHANNELS, "claim.submission_channel")
-        if err: errors.append(err)
-
-    # Validate ambulance data
-    if clm.get("ambulance"):
-        amb = clm["ambulance"]
-        if amb.get("weight_unit"):
-            err = validate_code(amb["weight_unit"], WEIGHT_UNITS, "claim.ambulance.weight_unit")
-            if err: errors.append(err)
-
-        if amb.get("transport_code"):
-            err = validate_code(amb["transport_code"], TRANSPORT_CODES, "claim.ambulance.transport_code")
-            if err: errors.append(err)
-
-        if amb.get("transport_reason"):
-            err = validate_code(amb["transport_reason"], TRANSPORT_REASON_CODES, "claim.ambulance.transport_reason")
-            if err: errors.append(err)
-
-        if amb.get("requested_date") and not re.match(r'^\d{4}-\d{2}-\d{2}$', amb["requested_date"]):
-            errors.append(f"claim.ambulance.requested_date must be in YYYY-MM-DD format")
-
-    # Validate services
-    if not claim_json.get("services"):
-        errors.append("At least one service is required")
-    else:
-        is_void_claim = clm.get("frequency_code") == "8"
-        for i, svc in enumerate(claim_json["services"], 1):
-            if not svc.get("hcpcs"):
-                errors.append(f"services[{i}].hcpcs is required")
-            elif len(svc["hcpcs"]) > 5:
-                errors.append(f"services[{i}].hcpcs must be ≤5 characters")
-
-            # Allow 0 charge for void claims
-            if svc.get("charge") is None:
-                errors.append(f"services[{i}].charge is required")
-            elif svc.get("charge") == 0 and not is_void_claim:
-                errors.append(f"services[{i}].charge must be > 0 (or use frequency_code=8 for void claims)")
-
-            if svc.get("modifiers"):
-                if len(svc["modifiers"]) > 4:
-                    errors.append(f"services[{i}].modifiers: maximum 4 modifiers allowed")
-                for mod in svc["modifiers"]:
-                    if len(mod) > 2:
-                        errors.append(f"services[{i}].modifiers: modifier '{mod}' must be ≤2 characters")
-
-            if svc.get("pos"):
-                err = validate_code(svc["pos"], POS_CODES, f"services[{i}].pos")
-                if err: errors.append(err)
-
-            if svc.get("dos") and not re.match(r'^\d{4}-\d{2}-\d{2}$', svc["dos"]):
-                errors.append(f"services[{i}].dos must be in YYYY-MM-DD format")
-
-            if svc.get("trip_type"):
-                err = validate_code(svc["trip_type"], TRIP_TYPES, f"services[{i}].trip_type")
-                if err: errors.append(err)
-
-            if svc.get("trip_leg"):
-                err = validate_code(svc["trip_leg"], TRIP_LEGS, f"services[{i}].trip_leg")
-                if err: errors.append(err)
-
-            if svc.get("payment_status"):
-                err = validate_code(svc["payment_status"], PAYMENT_STATUS_CODES, f"services[{i}].payment_status")
-                if err: errors.append(err)
-
-    if errors:
-        raise ValidationError("; ".join(errors))
+    # Convert ValidationReport errors to exception for backward compatibility
+    if not report.is_valid:
+        error_messages = [f"{err.field_path}: {err.message}" for err in report.errors]
+        raise ValidationError("; ".join(error_messages))
 
 class Config:
     def __init__(self, sender_qual="ZZ", sender_id="SENDERID", receiver_qual="ZZ", receiver_id="RECEIVERID",

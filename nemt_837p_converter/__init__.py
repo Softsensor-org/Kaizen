@@ -6,6 +6,10 @@ from .compliance import (
     X12ComplianceChecker, check_edi_compliance,
     ComplianceReport, ComplianceIssue, Severity
 )
+from .validation import (
+    PreSubmissionValidator, validate_claim_json,
+    ValidationReport, ValidationIssue, ValidationSeverity
+)
 from .codes import (
     POS_CODES, NEMT_HCPCS_CODES, HCPCS_MODIFIERS, FREQUENCY_CODES,
     TRANSPORT_CODES, TRANSPORT_REASON_CODES, WEIGHT_UNITS, GENDER_CODES,
@@ -19,6 +23,8 @@ __all__ = [
     "ClaimEnrichmentAgent", "enrich_claim",
     "X12ComplianceChecker", "check_edi_compliance",
     "ComplianceReport", "ComplianceIssue", "Severity",
+    "PreSubmissionValidator", "validate_claim_json",
+    "ValidationReport", "ValidationIssue", "ValidationSeverity",
     "POS_CODES", "NEMT_HCPCS_CODES", "HCPCS_MODIFIERS", "FREQUENCY_CODES",
     "TRANSPORT_CODES", "TRANSPORT_REASON_CODES", "WEIGHT_UNITS", "GENDER_CODES",
     "TRIP_TYPES", "TRIP_LEGS", "NETWORK_INDICATORS", "SUBMISSION_CHANNELS",

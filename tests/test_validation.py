@@ -47,7 +47,7 @@ def test_invalid_zip_raises_error(valid_claim_data):
     with pytest.raises(ValidationError) as exc_info:
         build_837p_from_json(valid_claim_data, cfg)
 
-    assert "not a valid zip code" in str(exc_info.value).lower()
+    assert ("must be format 12345" in str(exc_info.value) or "not a valid zip code" in str(exc_info.value).lower())
 
 
 def test_invalid_date_format_raises_error(valid_claim_data):
@@ -58,7 +58,7 @@ def test_invalid_date_format_raises_error(valid_claim_data):
     with pytest.raises(ValidationError) as exc_info:
         build_837p_from_json(valid_claim_data, cfg)
 
-    assert "yyyy-mm-dd format" in str(exc_info.value).lower()
+    assert ("format yyyy-mm-dd" in str(exc_info.value).lower() or "yyyy-mm-dd format" in str(exc_info.value).lower())
 
 
 def test_invalid_gender_raises_error(valid_claim_data):
@@ -102,7 +102,7 @@ def test_too_many_modifiers_raises_error(valid_claim_data):
     with pytest.raises(ValidationError) as exc_info:
         build_837p_from_json(valid_claim_data, cfg)
 
-    assert "maximum 4 modifiers" in str(exc_info.value).lower()
+    assert ("4 modifiers" in str(exc_info.value).lower() or "maximum 4 modifiers" in str(exc_info.value).lower())
 
 
 def test_missing_required_fields_raises_error(invalid_claim_data):
