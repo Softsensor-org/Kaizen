@@ -387,6 +387,9 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if svc.get("depart_time"): time_details.append(f"DEPRTTIME-{svc['depart_time']}")
         if time_details: w.segment("NTE", "ADD", ";".join(time_details))
 
+        # Line-level PYMS (must be at 2400 level, before 2420 provider loops)
+        if svc.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{svc['payment_status']}")
+
         # Supervising provider at line (2420D) and REF*LU Trip Number
         if svc.get("supervising_provider"):
             sp = svc["supervising_provider"]
@@ -405,9 +408,6 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if svc.get("dropoff"):
             w.segment("NM1", "45", "2"); w.segment("N3", svc["dropoff"].get("addr",""))
             w.segment("N4", svc["dropoff"].get("city",""), svc["dropoff"].get("state",""), svc["dropoff"].get("zip",""))
-
-        # Line-level PYMS
-        if svc.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{svc['payment_status']}")
 
         # 2430 adjudication (SVD + CAS)
         for adj in svc.get("adjudication", []):
