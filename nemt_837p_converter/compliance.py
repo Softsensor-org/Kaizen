@@ -339,6 +339,81 @@ class X12ComplianceChecker:
                     actual=f"{len(sv1.elements)} elements"
                 ))
 
+        # Check service + mileage adjacency (§2.1.11)
+        self._check_service_mileage_adjacency(sv1_segments)
+
+    def _check_service_mileage_adjacency(self, sv1_segments: List[Segment]):
+        """
+        Validate that mileage codes immediately follow their service codes (§2.1.11).
+
+        NEMT claims typically have service + mileage pairs:
+        - Service line (e.g., A0130, T2005)
+        - Mileage line (e.g., A0425, T2049)
+        """
+        # Mileage HCPCS codes that must follow service codes
+        MILEAGE_CODES = {
+            "A0021",  # Outside state per mile
+            "A0080",  # Per mile - volunteer
+            "A0090",  # Per mile - individual
+            "A0160",  # Per mile - case worker
+            "A0200",  # Mileage per mile (UHC KY)
+            "A0382",  # BLS mileage
+            "A0394",  # ALS mileage
+            "A0425",  # Ground mileage
+            "A0435",  # Fixed wing mileage
+            "A0436",  # Rotary wing mileage
+            "T2049",  # Stretcher van mileage
+        }
+
+        for i, sv1 in enumerate(sv1_segments):
+            if len(sv1.elements) < 1:
+                continue
+
+            # Extract HCPCS code from SV101 composite (HC:code:modifiers)
+            hcpcs_composite = sv1.elements[0]
+            # Parse "HC:A0130:EH" or "HC A0130 EH" format
+            hcpcs_parts = hcpcs_composite.replace(":", " ").split()
+            if len(hcpcs_parts) < 2:
+                continue
+
+            hcpcs_code = hcpcs_parts[1]  # Extract code (skip HC qualifier)
+
+            # Check if this is a mileage code
+            if hcpcs_code in MILEAGE_CODES:
+                # Mileage code should be preceded by a service code
+                if i == 0:
+                    # First service line is a mileage code - ERROR
+                    self.report.add_issue(ComplianceIssue(
+                        severity=Severity.ERROR,
+                        code="NEMT_003",
+                        message=f"Mileage code {hcpcs_code} appears as first service line - must follow a service code",
+                        segment_id="SV1",
+                        segment_index=sv1.index,
+                        loop_id="2400",
+                        expected="Service code before mileage code",
+                        actual=f"Mileage code {hcpcs_code} at position 1"
+                    ))
+                else:
+                    # Check if previous line is also a mileage code
+                    prev_sv1 = sv1_segments[i - 1]
+                    if len(prev_sv1.elements) > 0:
+                        prev_hcpcs_composite = prev_sv1.elements[0]
+                        prev_hcpcs_parts = prev_hcpcs_composite.replace(":", " ").split()
+                        if len(prev_hcpcs_parts) >= 2:
+                            prev_hcpcs_code = prev_hcpcs_parts[1]
+                            if prev_hcpcs_code in MILEAGE_CODES:
+                                # Consecutive mileage codes - WARNING
+                                self.report.add_issue(ComplianceIssue(
+                                    severity=Severity.WARNING,
+                                    code="NEMT_004",
+                                    message=f"Consecutive mileage codes detected: {prev_hcpcs_code} followed by {hcpcs_code}",
+                                    segment_id="SV1",
+                                    segment_index=sv1.index,
+                                    loop_id="2400",
+                                    expected="Service code before mileage code",
+                                    actual=f"Mileage code {prev_hcpcs_code} → {hcpcs_code}"
+                                ))
+
     def _check_qualifiers(self, segments: List[Segment]):
         """Validate qualifier codes and data element positioning"""
         # Check NM1 entity type codes

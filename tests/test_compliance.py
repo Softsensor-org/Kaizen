@@ -325,3 +325,139 @@ def test_valid_claim_compliance(valid_claim_data):
     # But should be compliant overall if no errors
     if len(report.errors) == 0:
         assert report.is_compliant is True
+
+def test_service_mileage_correct_order():
+    """Test service + mileage in correct order passes validation"""
+    edi_parts = [
+        "ISA*00*          *00*          *ZZ*TEST           *ZZ*RECV           *251111*1200*^*00501*1*T*:~",
+        "GS*HC*TEST*RECV*20251111*1200*1*X*005010X222A1~",
+        "ST*837*1~",
+        "BHT*0019*00*CLM001*20251111*1200*CH~",
+        "NM1*41*2*Submitter~",
+        "NM1*40*2*Receiver~",
+        "HL*1**20*1~",
+        "NM1*85*2*Provider*****XX*1234567890~",
+        "HL*2*1*22*0~",
+        "SBR*P*18~",
+        "NM1*IL*1*Doe*John~",
+        "NM1*PR*2*Payer~",
+        "CLM*CLM001*150.00~",
+        "CR1*LB*150*A*1*A*DH~",
+        "LX*1~",
+        "SV1*HC A0130 EH*100.00*UN*1***41**N~",  # Service code
+        "LX*2~",
+        "SV1*HC A0425 EH*50.00*UN*10***41**N~",  # Mileage code (correct order)
+        "SE*17*1~",
+        "GE*1*1~",
+        "IEA*1*1~"
+    ]
+    edi = "".join(edi_parts)
+    report = check_edi_compliance(edi)
+
+    # Should have no NEMT_003 or NEMT_004 errors
+    mileage_errors = [e for e in report.errors if e.code in ["NEMT_003", "NEMT_004"]]
+    mileage_warnings = [w for w in report.warnings if w.code in ["NEMT_003", "NEMT_004"]]
+    assert len(mileage_errors) == 0
+    assert len(mileage_warnings) == 0
+
+
+def test_mileage_first_generates_error():
+    """Test mileage code as first service line generates error"""
+    edi_parts = [
+        "ISA*00*          *00*          *ZZ*TEST           *ZZ*RECV           *251111*1200*^*00501*1*T*:~",
+        "GS*HC*TEST*RECV*20251111*1200*1*X*005010X222A1~",
+        "ST*837*1~",
+        "BHT*0019*00*CLM001*20251111*1200*CH~",
+        "NM1*41*2*Submitter~",
+        "NM1*40*2*Receiver~",
+        "HL*1**20*1~",
+        "NM1*85*2*Provider*****XX*1234567890~",
+        "HL*2*1*22*0~",
+        "SBR*P*18~",
+        "NM1*IL*1*Doe*John~",
+        "NM1*PR*2*Payer~",
+        "CLM*CLM001*50.00~",
+        "CR1*LB*150*A*1*A*DH~",
+        "LX*1~",
+        "SV1*HC A0425 EH*50.00*UN*10***41**N~",  # Mileage code FIRST (error!)
+        "SE*15*1~",
+        "GE*1*1~",
+        "IEA*1*1~"
+    ]
+    edi = "".join(edi_parts)
+    report = check_edi_compliance(edi)
+
+    # Should have NEMT_003 error
+    mileage_errors = [e for e in report.errors if e.code == "NEMT_003"]
+    assert len(mileage_errors) > 0
+    assert any("A0425" in e.message and "first service line" in e.message for e in mileage_errors)
+
+
+def test_consecutive_mileage_generates_warning():
+    """Test consecutive mileage codes generate warning"""
+    edi_parts = [
+        "ISA*00*          *00*          *ZZ*TEST           *ZZ*RECV           *251111*1200*^*00501*1*T*:~",
+        "GS*HC*TEST*RECV*20251111*1200*1*X*005010X222A1~",
+        "ST*837*1~",
+        "BHT*0019*00*CLM001*20251111*1200*CH~",
+        "NM1*41*2*Submitter~",
+        "NM1*40*2*Receiver~",
+        "HL*1**20*1~",
+        "NM1*85*2*Provider*****XX*1234567890~",
+        "HL*2*1*22*0~",
+        "SBR*P*18~",
+        "NM1*IL*1*Doe*John~",
+        "NM1*PR*2*Payer~",
+        "CLM*CLM001*150.00~",
+        "CR1*LB*150*A*1*A*DH~",
+        "LX*1~",
+        "SV1*HC A0130 EH*100.00*UN*1***41**N~",  # Service code
+        "LX*2~",
+        "SV1*HC A0425 EH*25.00*UN*5***41**N~",  # Mileage code
+        "LX*3~",
+        "SV1*HC T2049 EH*25.00*UN*5***41**N~",  # Another mileage code (warning!)
+        "SE*18*1~",
+        "GE*1*1~",
+        "IEA*1*1~"
+    ]
+    edi = "".join(edi_parts)
+    report = check_edi_compliance(edi)
+
+    # Should have NEMT_004 warning
+    mileage_warnings = [w for w in report.warnings if w.code == "NEMT_004"]
+    assert len(mileage_warnings) > 0
+    assert any("Consecutive mileage" in w.message and "A0425" in w.message and "T2049" in w.message
+              for w in mileage_warnings)
+
+
+def test_t2049_mileage_validation():
+    """Test T2049 stretcher van mileage code validation"""
+    edi_parts = [
+        "ISA*00*          *00*          *ZZ*TEST           *ZZ*RECV           *251111*1200*^*00501*1*T*:~",
+        "GS*HC*TEST*RECV*20251111*1200*1*X*005010X222A1~",
+        "ST*837*1~",
+        "BHT*0019*00*CLM001*20251111*1200*CH~",
+        "NM1*41*2*Submitter~",
+        "NM1*40*2*Receiver~",
+        "HL*1**20*1~",
+        "NM1*85*2*Provider*****XX*1234567890~",
+        "HL*2*1*22*0~",
+        "SBR*P*18~",
+        "NM1*IL*1*Doe*John~",
+        "NM1*PR*2*Payer~",
+        "CLM*CLM001*90.00~",
+        "CR1*LB*150*A*1*A*DH~",
+        "LX*1~",
+        "SV1*HC T2005 EH*50.00*UN*1***41**N~",  # Service: Stretcher van
+        "LX*2~",
+        "SV1*HC T2049 EH*40.00*UN*10***41**N~",  # Mileage: Stretcher van mileage
+        "SE*17*1~",
+        "GE*1*1~",
+        "IEA*1*1~"
+    ]
+    edi = "".join(edi_parts)
+    report = check_edi_compliance(edi)
+
+    # T2049 following T2005 should be valid
+    mileage_errors = [e for e in report.errors if e.code in ["NEMT_003", "NEMT_004"]]
+    assert len(mileage_errors) == 0
