@@ -49,7 +49,7 @@ NEMT_HCPCS_CODES = {
     "A0170": "Transportation ancillary: parking fees, tolls, other",
     "A0180": "Non-emergency transportation: ancillary: lodging-recipient",
     "A0190": "Non-emergency transportation: ancillary: meals-recipient",
-    "A0200": "Non-emergency transportation: ancillary: lodging-escort",
+    "A0200": "Non-emergency transportation: mileage, per mile",  # UHC Kentucky payer-specific variation
     "A0210": "Non-emergency transportation: ancillary: meals-escort",
     "A0225": "Ambulance service, neonatal transport, base rate, emergency transport",
     "A0382": "BLS mileage (per mile)",
@@ -73,11 +73,19 @@ NEMT_HCPCS_CODES = {
     "A0434": "Specialty care transport (SCT)",
     "A0435": "Fixed wing air mileage, per statute mile",
     "A0436": "Rotary wing air mileage, per statute mile",
+    # T2xxx series - Non-emergency transportation
+    "T2001": "Non-emergency transportation; patient attendant/escort",
+    "T2002": "Non-emergency transportation; per diem",
+    "T2003": "Non-emergency transportation; encounter/trip",
+    "T2004": "Non-emergency transportation; commercial carrier, multi-pass",
+    "T2005": "Non-emergency transportation; stretcher van",
+    "T2007": "Transportation waiting time, air ambulance and non-emergency vehicle, one-half (1/2) hour increments",
+    "T2049": "Non-emergency transportation; stretcher van, mileage; per mile",
 }
 
-# Common HCPCS Modifiers for NEMT
+# HCPCS Modifiers for NEMT
 HCPCS_MODIFIERS = {
-    "EH": "NEMT medical necessity",
+    # Functional modifiers (NEMT-specific)
     "GA": "Waiver of liability statement issued as required by payer policy",
     "GY": "Item or service statutorily excluded",
     "GZ": "Item or service expected to be denied",
@@ -86,18 +94,151 @@ HCPCS_MODIFIERS = {
     "GM": "Multiple patients on one ambulance trip",
     "QL": "Patient pronounced dead after ambulance called",
     "TQ": "Basic life support transport by a volunteer ambulance provider",
-    # Origin/Destination codes
-    "D": "Diagnostic or therapeutic site other than 'P' or 'H' when these are used as origin codes",
-    "E": "Residential, Domiciliary, Custodial Facility",
-    "G": "Hospital-based dialysis facility",
-    "H": "Hospital",
-    "I": "Site of transfer between ambulance, car, helicopter",
-    "J": "Non-hospital-based dialysis facility",
-    "N": "Skilled nursing facility",
-    "P": "Physician's office",
-    "R": "Residence",
-    "S": "Scene of accident or acute event",
-    "X": "Intermediate stop at physician's office",
+
+    # Two-letter origin-destination modifiers (110 total)
+    # Format: [Origin Letter][Destination Letter]
+
+    # D-Series: FROM Diagnostic/therapeutic site (11 modifiers)
+    "DD": "Diagnostic/therapeutic → Diagnostic/therapeutic",
+    "DE": "Diagnostic/therapeutic → Residential/Domiciliary",
+    "DG": "Diagnostic/therapeutic → Hospital-based Dialysis",
+    "DH": "Diagnostic/therapeutic → Hospital",
+    "DI": "Diagnostic/therapeutic → Site of transfer",
+    "DJ": "Diagnostic/therapeutic → Non-hospital Dialysis",
+    "DN": "Diagnostic/therapeutic → Skilled Nursing Facility",
+    "DP": "Diagnostic/therapeutic → Physician's office",
+    "DR": "Diagnostic/therapeutic → Residence",
+    "DS": "Diagnostic/therapeutic → Scene of Accident",
+    "DX": "Diagnostic/therapeutic → Intermediate stop",
+
+    # E-Series: FROM Residential/Domiciliary (11 modifiers)
+    "ED": "Residential/Domiciliary → Diagnostic/therapeutic",
+    "EE": "Residential/Domiciliary → Residential/Domiciliary",
+    "EG": "Residential/Domiciliary → Hospital-based Dialysis",
+    "EH": "Residential/Domiciliary → Hospital",
+    "EI": "Residential/Domiciliary → Site of transfer",
+    "EJ": "Residential/Domiciliary → Non-hospital Dialysis",
+    "EN": "Residential/Domiciliary → Skilled Nursing Facility",
+    "EP": "Residential/Domiciliary → Physician's office",
+    "ER": "Residential/Domiciliary → Residence",
+    "ES": "Residential/Domiciliary → Scene of Accident",
+    "EX": "Residential/Domiciliary → Intermediate stop",
+
+    # G-Series: FROM Hospital-based Dialysis (11 modifiers)
+    "GD": "Hospital-based Dialysis → Diagnostic/therapeutic",
+    "GE": "Hospital-based Dialysis → Residential/Domiciliary",
+    "GG": "Hospital-based Dialysis → Hospital-based Dialysis",
+    "GH": "Hospital-based Dialysis → Hospital",
+    "GI": "Hospital-based Dialysis → Site of transfer",
+    "GJ": "Hospital-based Dialysis → Non-hospital Dialysis",
+    "GN": "Hospital-based Dialysis → Skilled Nursing Facility",
+    "GP": "Hospital-based Dialysis → Physician's office",
+    "GR": "Hospital-based Dialysis → Residence",
+    "GS": "Hospital-based Dialysis → Scene of Accident",
+    "GX": "Hospital-based Dialysis → Intermediate stop",
+
+    # H-Series: FROM Hospital (11 modifiers)
+    "HD": "Hospital → Diagnostic/therapeutic",
+    "HE": "Hospital → Residential/Domiciliary",
+    "HG": "Hospital → Hospital-based Dialysis",
+    "HH": "Hospital → Hospital",
+    "HI": "Hospital → Site of transfer",
+    "HJ": "Hospital → Non-hospital Dialysis",
+    "HN": "Hospital → Skilled Nursing Facility",
+    "HP": "Hospital → Physician's office",
+    "HR": "Hospital → Residence",
+    "HS": "Hospital → Scene of Accident",
+    "HX": "Hospital → Intermediate stop",
+
+    # I-Series: FROM Site of transfer (11 modifiers)
+    "ID": "Site of transfer → Diagnostic/therapeutic",
+    "IE": "Site of transfer → Residential/Domiciliary",
+    "IG": "Site of transfer → Hospital-based Dialysis",
+    "IH": "Site of transfer → Hospital",
+    "II": "Site of transfer → Site of transfer",
+    "IJ": "Site of transfer → Non-hospital Dialysis",
+    "IN": "Site of transfer → Skilled Nursing Facility",
+    "IP": "Site of transfer → Physician's office",
+    "IR": "Site of transfer → Residence",
+    "IS": "Site of transfer → Scene of Accident",
+    "IX": "Site of transfer → Intermediate stop",
+
+    # J-Series: FROM Non-hospital Dialysis (11 modifiers)
+    "JD": "Non-hospital Dialysis → Diagnostic/therapeutic",
+    "JE": "Non-hospital Dialysis → Residential/Domiciliary",
+    "JG": "Non-hospital Dialysis → Hospital-based Dialysis",
+    "JH": "Non-hospital Dialysis → Hospital",
+    "JI": "Non-hospital Dialysis → Site of transfer",
+    "JJ": "Non-hospital Dialysis → Non-hospital Dialysis",
+    "JN": "Non-hospital Dialysis → Skilled Nursing Facility",
+    "JP": "Non-hospital Dialysis → Physician's office",
+    "JR": "Non-hospital Dialysis → Residence",
+    "JS": "Non-hospital Dialysis → Scene of Accident",
+    "JX": "Non-hospital Dialysis → Intermediate stop",
+
+    # N-Series: FROM Skilled Nursing Facility (11 modifiers)
+    "ND": "Skilled Nursing Facility → Diagnostic/therapeutic",
+    "NE": "Skilled Nursing Facility → Residential/Domiciliary",
+    "NG": "Skilled Nursing Facility → Hospital-based Dialysis",
+    "NH": "Skilled Nursing Facility → Hospital",
+    "NI": "Skilled Nursing Facility → Site of transfer",
+    "NJ": "Skilled Nursing Facility → Non-hospital Dialysis",
+    "NN": "Skilled Nursing Facility → Skilled Nursing Facility",
+    "NP": "Skilled Nursing Facility → Physician's office",
+    "NR": "Skilled Nursing Facility → Residence",
+    "NS": "Skilled Nursing Facility → Scene of Accident",
+    "NX": "Skilled Nursing Facility → Intermediate stop",
+
+    # P-Series: FROM Physician's office (11 modifiers)
+    "PD": "Physician's office → Diagnostic/therapeutic",
+    "PE": "Physician's office → Residential/Domiciliary",
+    "PG": "Physician's office → Hospital-based Dialysis",
+    "PH": "Physician's office → Hospital",
+    "PI": "Physician's office → Site of transfer",
+    "PJ": "Physician's office → Non-hospital Dialysis",
+    "PN": "Physician's office → Skilled Nursing Facility",
+    "PP": "Physician's office → Physician's office",
+    "PR": "Physician's office → Residence",
+    "PS": "Physician's office → Scene of Accident",
+    "PX": "Physician's office → Intermediate stop",
+
+    # R-Series: FROM Residence (11 modifiers)
+    "RD": "Residence → Diagnostic/therapeutic",
+    "RE": "Residence → Residential/Domiciliary",
+    "RG": "Residence → Hospital-based Dialysis",
+    "RH": "Residence → Hospital",
+    "RI": "Residence → Site of transfer",
+    "RJ": "Residence → Non-hospital Dialysis",
+    "RN": "Residence → Skilled Nursing Facility",
+    "RP": "Residence → Physician's office",
+    "RR": "Residence → Residence",
+    "RS": "Residence → Scene of Accident",
+    "RX": "Residence → Intermediate stop",
+
+    # S-Series: FROM Scene of Accident (11 modifiers)
+    "SD": "Scene of Accident → Diagnostic/therapeutic",
+    "SE": "Scene of Accident → Residential/Domiciliary",
+    "SG": "Scene of Accident → Hospital-based Dialysis",
+    "SH": "Scene of Accident → Hospital",
+    "SI": "Scene of Accident → Site of transfer",
+    "SJ": "Scene of Accident → Non-hospital Dialysis",
+    "SN": "Scene of Accident → Skilled Nursing Facility",
+    "SP": "Scene of Accident → Physician's office",
+    "SR": "Scene of Accident → Residence",
+    "SS": "Scene of Accident → Scene of Accident",
+    "SX": "Scene of Accident → Intermediate stop",
+
+    # X-Series: FROM Intermediate stop (10 modifiers)
+    "XD": "Intermediate stop → Diagnostic/therapeutic",
+    "XE": "Intermediate stop → Residential/Domiciliary",
+    "XG": "Intermediate stop → Hospital-based Dialysis",
+    "XH": "Intermediate stop → Hospital",
+    "XI": "Intermediate stop → Site of transfer",
+    "XJ": "Intermediate stop → Non-hospital Dialysis",
+    "XN": "Intermediate stop → Skilled Nursing Facility",
+    "XP": "Intermediate stop → Physician's office",
+    "XR": "Intermediate stop → Residence",
+    "XS": "Intermediate stop → Scene of Accident",
 }
 
 # Frequency/Type of Bill Codes (CLM05-3)
