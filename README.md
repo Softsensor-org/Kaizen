@@ -195,15 +195,49 @@ Validation Error: billing_provider.npi must be 10 digits, got: 123; billing_prov
 python -m nemt_837p_converter claim.json --out out.edi --enrich ...
 ```
 
-### 8. Comprehensive Test Suite
-- **37 test cases** - Full coverage of validation, enrichment, and EDI generation
+### 8. X12 Compliance Checker (Agent 2)
+- **Automated X12 validation** - Post-generation EDI structure validation
+- **Structured reporting** - ComplianceReport with ERROR/WARNING/INFO severity levels
+- **Validation categories:**
+  - Envelope structure (ISA/GS/ST/SE/GE/IEA pairing)
+  - Loop hierarchy and positioning (2300 → 2310 → 2400 → 2420 → 2430)
+  - Segment ordering within loops (K3 before NM1 providers)
+  - NEMT-specific requirements (CR1, SV1 emergency indicator)
+  - Provider loop ambiguity detection (2310E/F vs 2420G/H)
+  - Qualifier code validation (NM1 entity types)
+- **Use cases:**
+  - Pre-submission validation before sending to clearinghouse
+  - Regression testing for EDI structure changes
+  - Compliance auditing and quality assurance
+
+**Example:**
+```python
+from nemt_837p_converter import build_837p_from_json, check_edi_compliance
+
+# Generate EDI
+edi = build_837p_from_json(claim_data, config)
+
+# Validate X12 compliance
+report = check_edi_compliance(edi)
+
+if not report.is_compliant:
+    print(f"Found {len(report.errors)} errors:")
+    for error in report.errors:
+        print(f"  [{error.code}] {error.message}")
+else:
+    print("EDI is X12 compliant!")
+```
+
+### 9. Comprehensive Test Suite
+- **51 test cases** - Full coverage of validation, enrichment, EDI generation, and compliance
 - **Test categories:**
   - Validation tests (12 tests) - Field validation, code values, formats
   - Enrichment tests (15 tests) - Default values, cascading, in-place
   - Builder tests (11 tests) - EDI structure, segments, frequency codes
+  - Compliance tests (14 tests) - X12 structure, loop hierarchy, segment ordering
 - **Test fixtures** - Valid, minimal, invalid, replacement, void claims
 - **Run tests:** `pytest tests/ -v`
-- **Coverage:** Core functionality, edge cases, error handling
+- **Coverage:** Core functionality, edge cases, error handling, X12 compliance
 - **Continuous testing** - Easy to add new tests for new features
 
 **Run tests:**
