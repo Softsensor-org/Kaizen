@@ -1,0 +1,222 @@
+{
+  "submitter": {
+    "id_qualifier": "ZZ",
+    "id": "KAIZENKZN01",
+    "name": "KAIZEN HEALTH",
+    "contact_name": "EDI Ops",
+    "contact_phone": "9735550100"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY & STATE",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "1437382910",
+    "tax_id": "111223333",
+    "taxonomy": "343900000X",
+    "name": "ABC Transport",
+    "address": {
+      "line1": "455 Fleet Ave",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    }
+  },
+  "subscriber": {
+    "relationship": "self",
+    "member_id": "KY000111222",
+    "name": {
+      "last": "Doe",
+      "first": "John"
+    },
+    "dob": "1985-05-12",
+    "sex": "M",
+    "address": {
+      "line1": "55 Oak Rd",
+      "city": "Frankfort",
+      "state": "KY",
+      "zip": "40601"
+    }
+  },
+  "claim": {
+    "clm_number": "DUP-STATE-SCEN1",
+    "total_charge": 510.0,
+    "pos": "41",
+    "icd10": [
+      "R99"
+    ],
+    "from": "2026-01-01",
+    "to": "2026-01-01",
+    "frequency_code": "1",
+    "ambulance": {
+      "patient_weight_lbs": 165,
+      "weight_unit": "LB",
+      "transport_code": "A",
+      "transport_reason": "DH"
+    }
+  },
+  "services": [
+    {
+      "seq": 1,
+      "hcpcs": "T2005",
+      "modifiers": ["EH"],
+      "units": 1,
+      "charge": 55.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "RE",
+      "pickup_time": "0800",
+      "drop_loc_code": "HO",
+      "drop_time": "0830",
+      "trip_type": "I",
+      "trip_leg": "A",
+      "pickup": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      }
+    },
+    {
+      "seq": 2,
+      "hcpcs": "T2049",
+      "modifiers": ["EH"],
+      "units": 8,
+      "charge": 80.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "RE",
+      "pickup_time": "0800",
+      "drop_loc_code": "HO",
+      "drop_time": "0830",
+      "trip_type": "I",
+      "trip_leg": "A",
+      "pickup": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      }
+    },
+    {
+      "seq": 3,
+      "hcpcs": "T2005",
+      "modifiers": ["HG"],
+      "units": 1,
+      "charge": 55.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "HO",
+      "pickup_time": "1100",
+      "drop_loc_code": "LB",
+      "drop_time": "1120",
+      "trip_type": "B",
+      "trip_leg": "A",
+      "pickup": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      },
+      "dropoff": {
+        "addr": "15 Lab Way",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40504"
+      }
+    },
+    {
+      "seq": 4,
+      "hcpcs": "T2049",
+      "modifiers": ["HG"],
+      "units": 10,
+      "charge": 110.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "HO",
+      "pickup_time": "1100",
+      "drop_loc_code": "LB",
+      "drop_time": "1120",
+      "trip_type": "B",
+      "trip_leg": "A",
+      "pickup": {
+        "addr": "100 Hospital Dr",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40508"
+      },
+      "dropoff": {
+        "addr": "15 Lab Way",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40504"
+      }
+    },
+    {
+      "seq": 5,
+      "hcpcs": "T2005",
+      "modifiers": ["GR"],
+      "units": 1,
+      "charge": 55.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "LB",
+      "pickup_time": "1400",
+      "drop_loc_code": "RE",
+      "drop_time": "1435",
+      "trip_type": "R",
+      "trip_leg": "B",
+      "pickup": {
+        "addr": "15 Lab Way",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40504"
+      },
+      "dropoff": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      }
+    },
+    {
+      "seq": 6,
+      "hcpcs": "T2049",
+      "modifiers": ["GR"],
+      "units": 12,
+      "charge": 155.0,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "pickup_loc_code": "LB",
+      "pickup_time": "1400",
+      "drop_loc_code": "RE",
+      "drop_time": "1435",
+      "trip_type": "R",
+      "trip_leg": "B",
+      "pickup": {
+        "addr": "15 Lab Way",
+        "city": "Lexington",
+        "state": "KY",
+        "zip": "40504"
+      },
+      "dropoff": {
+        "addr": "55 Oak Rd",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      }
+    }
+  ]
+}

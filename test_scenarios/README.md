@@ -243,6 +243,57 @@ Please advise on the recommended approach for production claims.
 
 ---
 
+## Duplicate Rejection Mitigation Scenarios (State Reporting)
+
+States that de-duplicate by `Member + DOS + Provider` require different claim
+structures depending on whether the same rendering provider covers every leg or
+multiple providers split the itinerary.
+
+### Scenario 4: Multiple Legs, Single Provider
+**File**: `scenario4_multi_trip_single_provider.json`
+
+- Member takes three legs (Residence→Hospital→Lab→Residence) on the same DOS
+- All transportation handled by **ABC Transport**
+- Submit **one claim** with **six service lines** (pairs T2005/T2049 per leg)
+- Prevents duplicate rejects because only one claim exists for the provider/DOS
+
+Convert and inspect:
+```bash
+python -m nemt_837p_converter test_scenarios/scenario4_multi_trip_single_provider.json \
+  --out out/scenario4.edi \
+  --sender-qual ZZ --sender-id KAIZENKZN01 \
+  --receiver-qual ZZ --receiver-id 030240928 \
+  --usage T --gs-sender KAIZENKZN01 --gs-receiver 030240928
+```
+
+### Scenario 5: Multiple Legs, Multiple Providers
+**Folder**: `scenario5_multi_provider/`
+
+- Same member/DOS, but each leg handled by a different rendering provider
+- Files:
+  - `claim_cab_transport.json` (Residence→Hospital)
+  - `claim_abc_transport.json` (Hospital→Lab)
+  - `claim_def_transport.json` (Lab→Residence)
+- Submit **three claims** (one per provider) with two service lines each
+
+Convert each claim separately:
+```bash
+for claim in claim_cab_transport claim_abc_transport claim_def_transport; do
+  python -m nemt_837p_converter test_scenarios/scenario5_multi_provider/${claim}.json \
+    --out out/${claim}.edi \
+    --sender-qual ZZ --sender-id KAIZENKZN01 \
+    --receiver-qual ZZ --receiver-id 030240928 \
+    --usage T --gs-sender KAIZENKZN01 --gs-receiver 030240928;
+done
+```
+
+**Acceptance Criteria**
+- Scenario 4: One claim, six `LX` segments, single billing/rendering provider
+- Scenario 5: Three claims, two service lines each, provider-specific billing info
+- Both approaches align with state duplicate logic (unique per DOS + provider)
+
+---
+
 ## Files in This Directory
 
 - `README.md` - This file
@@ -253,6 +304,8 @@ Please advise on the recommended approach for production claims.
 - `scenario3_both_levels_ambiguous.json` - Scenario 3 input data
 - `scenario3_both_levels_ambiguous.edi` - Scenario 3 EDI output
 - `analyze_scenarios.py` - Compliance analysis script
+- `scenario4_multi_trip_single_provider.json` - Duplicate mitigation Scenario 4
+- `scenario5_multi_provider/` - Folder containing three provider-specific claims
 
 ---
 
