@@ -1,0 +1,107 @@
+{
+  "_comment": "Scenario 2 - Claim 3: DEF Transport (Trip 3 of 3)",
+  "submitter": {
+    "name": "Kaizen Health Services",
+    "id": "KAIZEN01",
+    "contact": "Claims Department",
+    "phone": "5555551234"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "5555555555",
+    "name": "DEF Transport Services",
+    "taxonomy": "343900000X",
+    "address": {
+      "line1": "300 Driver Road",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    },
+    "tax_id": "555555555"
+  },
+  "rendering_provider": {
+    "npi": "6666666666",
+    "last": "Smith",
+    "first": "Bob",
+    "address_line1": "300 Driver Road",
+    "city": "Louisville",
+    "state": "KY",
+    "zip": "40202"
+  },
+  "subscriber": {
+    "member_id": "JOHN123456",
+    "name": {
+      "last": "Doe",
+      "first": "John"
+    },
+    "dob": "1960-05-15",
+    "gender": "M",
+    "address": {
+      "line1": "456 Residence St",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40203"
+    }
+  },
+  "claim": {
+    "clm_number": "CLM20260101DEF003",
+    "from": "2026-01-01",
+    "to": "2026-01-01",
+    "pos": "41",
+    "frequency": "1",
+    "total_charge": 220.00,
+    "network_indicator": "I",
+    "rendering_network_indicator": "I",
+    "authorization_number": "AUTH789456",
+    "member_group": {
+      "group_id": "KYUHC001",
+      "sub_group_id": "KYSUB01",
+      "class_id": "KYCLASS1",
+      "plan_id": "KYPLAN01",
+      "product_id": "KYPROD01"
+    },
+    "ambulance": {
+      "transport_code": "A",
+      "transport_reason": "C",
+      "patient_weight_lbs": 200,
+      "weight_unit": "LB"
+    }
+  },
+  "services": [
+    {
+      "hcpcs": "T2005",
+      "modifiers": ["GR"],
+      "charge": 100.00,
+      "units": 1,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "emergency": false,
+      "trip_number": 3,
+      "pickup": {
+        "addr": "321 Lab Center Blvd",
+        "city": "Louisville",
+        "state": "KY",
+        "zip": "40205"
+      },
+      "dropoff": {
+        "addr": "456 Residence St",
+        "city": "Louisville",
+        "state": "KY",
+        "zip": "40203"
+      }
+    },
+    {
+      "hcpcs": "T2049",
+      "modifiers": ["GR"],
+      "charge": 120.00,
+      "units": 12,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "emergency": false,
+      "trip_number": 3
+    }
+  ]
+}

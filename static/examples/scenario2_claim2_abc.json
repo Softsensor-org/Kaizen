@@ -1,0 +1,107 @@
+{
+  "_comment": "Scenario 2 - Claim 2: ABC Transport (Trip 2 of 3)",
+  "submitter": {
+    "name": "Kaizen Health Services",
+    "id": "KAIZEN01",
+    "contact": "Claims Department",
+    "phone": "5555551234"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "3333333333",
+    "name": "ABC Transport Services",
+    "taxonomy": "343900000X",
+    "address": {
+      "line1": "100 Transport Way",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    },
+    "tax_id": "333333333"
+  },
+  "rendering_provider": {
+    "npi": "4444444444",
+    "last": "Driver",
+    "first": "Jane",
+    "address_line1": "100 Transport Way",
+    "city": "Louisville",
+    "state": "KY",
+    "zip": "40202"
+  },
+  "subscriber": {
+    "member_id": "JOHN123456",
+    "name": {
+      "last": "Doe",
+      "first": "John"
+    },
+    "dob": "1960-05-15",
+    "gender": "M",
+    "address": {
+      "line1": "456 Residence St",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40203"
+    }
+  },
+  "claim": {
+    "clm_number": "CLM20260101ABC002",
+    "from": "2026-01-01",
+    "to": "2026-01-01",
+    "pos": "41",
+    "frequency": "1",
+    "total_charge": 225.00,
+    "network_indicator": "I",
+    "rendering_network_indicator": "I",
+    "authorization_number": "AUTH789456",
+    "member_group": {
+      "group_id": "KYUHC001",
+      "sub_group_id": "KYSUB01",
+      "class_id": "KYCLASS1",
+      "plan_id": "KYPLAN01",
+      "product_id": "KYPROD01"
+    },
+    "ambulance": {
+      "transport_code": "A",
+      "transport_reason": "C",
+      "patient_weight_lbs": 200,
+      "weight_unit": "LB"
+    }
+  },
+  "services": [
+    {
+      "hcpcs": "T2006",
+      "modifiers": ["HG"],
+      "charge": 125.00,
+      "units": 1,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "emergency": false,
+      "trip_number": 2,
+      "pickup": {
+        "addr": "789 Hospital Drive",
+        "city": "Louisville",
+        "state": "KY",
+        "zip": "40204"
+      },
+      "dropoff": {
+        "addr": "321 Lab Center Blvd",
+        "city": "Louisville",
+        "state": "KY",
+        "zip": "40205"
+      }
+    },
+    {
+      "hcpcs": "T2049",
+      "modifiers": ["HG"],
+      "charge": 100.00,
+      "units": 10,
+      "dos": "2026-01-01",
+      "pos": "41",
+      "emergency": false,
+      "trip_number": 2
+    }
+  ]
+}
