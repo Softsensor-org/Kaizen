@@ -35,7 +35,7 @@ def validate_claim_json(claim_json: dict):
 class Config:
     def __init__(self, sender_qual="ZZ", sender_id="SENDERID", receiver_qual="ZZ", receiver_id="RECEIVERID",
                  usage_indicator="T", gs_sender_code="SENDER", gs_receiver_code="RECEIVER", component_sep=":",
-                 payer_config=None, use_cr1_locations=False):
+                 payer_config=None, use_cr1_locations=True):
         self.sender_qual = sender_qual
         self.sender_id = sender_id
         self.receiver_qual = receiver_qual
@@ -45,7 +45,7 @@ class Config:
         self.gs_receiver_code = gs_receiver_code
         self.component_sep = component_sep
         self.payer_config = payer_config  # PayerConfig object for payer-specific settings
-        self.use_cr1_locations = use_cr1_locations  # Per §2.1.8: Use CR109/CR110 for pickup/dropoff in CR1 instead of NTE+Loops
+        self.use_cr1_locations = use_cr1_locations  # Per §2.1.8: Use CR109/CR110 for pickup/dropoff in CR1 (DEFAULT per Kaizen vendor spec)
 
 def _fmt_d8(s):
     if not s: return None
@@ -162,9 +162,33 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if clm.get("patient_amount_paid") is not None:
         w.segment("AMT", "F5", f"{float(clm['patient_amount_paid']):.2f}")  # Patient Amount Paid
 
+    # Coordination of Benefits (COB) - Other Payer Amounts
+    if clm.get("other_payer_paid_amount") is not None:
+        w.segment("AMT", "EAF", f"{float(clm['other_payer_paid_amount']):.2f}")  # Other Payer - Primary/Secondary Amount Paid
+    if clm.get("other_payer_allowed_amount") is not None:
+        w.segment("AMT", "B6", f"{float(clm['other_payer_allowed_amount']):.2f}")  # Other Payer - Allowed Amount
+    if clm.get("other_payer_coverage_amount") is not None:
+        w.segment("AMT", "AU", f"{float(clm['other_payer_coverage_amount']):.2f}")  # Other Payer - Coverage Amount
+    if clm.get("patient_responsibility_amount") is not None:
+        w.segment("AMT", "F2", f"{float(clm['patient_responsibility_amount']):.2f}")  # Patient Responsibility Amount
+
     # Per §2.1.5: Adjustment Reason Codes - CAS segments at claim level
-    if clm.get("cas_segments"):
-        for cas in clm["cas_segments"]:
+    # Auto-generate CAS for denied claims if not provided
+    cas_segments = clm.get("cas_segments", [])
+    if clm.get("payment_status") == "D" and not cas_segments:
+        # Auto-generate denial CAS segment
+        # CO*45 = "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement"
+        # This is a common denial reason code
+        total_charge = clm.get("total_charge", 0)
+        cas_segments = [{
+            "group_code": "CO",  # Contractual Obligation
+            "reason_code": "45",  # Charge exceeds maximum allowable
+            "amount": total_charge,
+            "quantity": ""
+        }]
+
+    if cas_segments:
+        for cas in cas_segments:
             # CAS format: CAS*group_code*reason_code*amount*quantity~
             w.segment("CAS", cas.get("group_code"), cas.get("reason_code"),
                      f"{float(cas.get('amount', 0)):.2f}" if cas.get("amount") else "",
@@ -173,6 +197,10 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     # Per §2.1.4: Denied Claims - MOA segment for RARC codes
     if clm.get("remittance_advice_code"):
         w.segment("MOA", "", clm["remittance_advice_code"])
+    elif clm.get("payment_status") == "D":
+        # Auto-generate MOA for denied claims if not provided
+        # MA130 = "Your claim/service(s) has been denied"
+        w.segment("MOA", "", "MA130")
 
     # K3 occurrences: PYMS; SUB/IPAD/USER; SNWK; TRPN-ASPUFE*; DREC/DADJ/PAIDDT
     if clm.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{clm['payment_status']}")
@@ -214,17 +242,16 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             if rend.get("zip"): location_parts.append(f"ZIP-{rend['zip']}")
             w.segment("K3", ";".join(location_parts))
 
-    # NTE member group structure
+    # NTE member group structure (MANDATORY per §2.1.2 - validation ensures it exists)
     group = clm.get("member_group", {})
-    if any(group.get(k) for k in ("group_id","sub_group_id","class_id","plan_id","product_id")):
-        nte = [
-            f"GRP-{group.get('group_id','')}",
-            f"SGR-{group.get('sub_group_id','')}",
-            f"CLS-{group.get('class_id','')}",
-            f"PLN-{group.get('plan_id','')}",
-            f"PRD-{group.get('product_id','')}"
-        ]
-        w.segment("NTE", "ADD", ";".join(nte))
+    nte = [
+        f"GRP-{group.get('group_id','')}",
+        f"SGR-{group.get('sub_group_id','')}",
+        f"CLS-{group.get('class_id','')}",
+        f"PLN-{group.get('plan_id','')}",
+        f"PRD-{group.get('product_id','')}"
+    ]
+    w.segment("NTE", "ADD", ";".join(nte))
 
     # Ambulance/NEMT claim-level CR1
     amb = clm.get("ambulance", {})
@@ -440,8 +467,20 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         if svc.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{svc['payment_status']}")
 
         # Per §2.1.4: Service-level CAS segments for denied service lines
-        if svc.get("cas_segments"):
-            for cas in svc["cas_segments"]:
+        # Auto-generate CAS for denied service lines if not provided
+        svc_cas_segments = svc.get("cas_segments", [])
+        if svc.get("payment_status") == "D" and not svc_cas_segments:
+            # Auto-generate denial CAS segment for service line
+            svc_charge = svc.get("charge", 0)
+            svc_cas_segments = [{
+                "group_code": "CO",  # Contractual Obligation
+                "reason_code": "45",  # Charge exceeds maximum allowable
+                "amount": svc_charge,
+                "quantity": ""
+            }]
+
+        if svc_cas_segments:
+            for cas in svc_cas_segments:
                 # CAS format: CAS*group_code*reason_code*amount*quantity~
                 w.segment("CAS", cas.get("group_code"), cas.get("reason_code"),
                          f"{float(cas.get('amount', 0)):.2f}" if cas.get("amount") else "",
@@ -450,6 +489,9 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         # Per §2.1.4: Service-level MOA segment for RARC codes
         if svc.get("remittance_advice_code"):
             w.segment("MOA", "", svc["remittance_advice_code"])
+        elif svc.get("payment_status") == "D":
+            # Auto-generate MOA for denied service lines if not provided
+            w.segment("MOA", "", "MA130")
 
         # Loop 2420D - Supervising Provider (Service Line Level)
         if svc.get("supervising_provider"):

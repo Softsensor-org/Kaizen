@@ -74,7 +74,7 @@ def test_payer_config_in_edi(valid_claim_data):
 
 
 def test_cr1_segment_proper_format(valid_claim_data):
-    """Test that CR1 segment has proper format (not invalid CR109/CR110)"""
+    """Test that CR1 segment has proper CR109/CR110 format (default per §2.1.8)"""
     valid_claim_data["claim"]["ambulance"] = {
         "weight_unit": "LB",
         "patient_weight_lbs": 165,
@@ -85,8 +85,8 @@ def test_cr1_segment_proper_format(valid_claim_data):
 
     edi = build_837p_from_json(valid_claim_data, cfg)
 
-    # Should have proper CR1 segment (updated format with extra field for trip number)
-    assert "CR1*LB*165****A*DH" in edi
+    # Should have CR1 with CR109/CR110 format (10 elements, empty pickup/dropoff)
+    assert "CR1*LB*165*DH**A*****~" in edi
 
 
 def test_trip_details_in_nte_not_cr1(valid_claim_data):
@@ -104,8 +104,8 @@ def test_trip_details_in_nte_not_cr1(valid_claim_data):
     assert "SPECNEED-" in edi
 
 
-def test_pickup_dropoff_default_nte_mode(valid_claim_data):
-    """Test default mode: pickup/dropoff in Loop 2310E/F (NTE mode)"""
+def test_pickup_dropoff_legacy_nte_mode(valid_claim_data):
+    """Test legacy NTE mode: pickup/dropoff in Loop 2310E/F (use_cr1_locations=False)"""
     valid_claim_data["claim"]["ambulance"] = {
         "weight_unit": "LB",
         "patient_weight_lbs": 175,
@@ -145,7 +145,7 @@ def test_pickup_dropoff_default_nte_mode(valid_claim_data):
 
 
 def test_pickup_dropoff_cr109_cr110_mode(valid_claim_data):
-    """Test CR109/CR110 mode: pickup/dropoff in CR1 elements per §2.1.8"""
+    """Test default CR109/CR110 mode: pickup/dropoff in CR1 elements per §2.1.8 (Kaizen vendor spec)"""
     valid_claim_data["claim"]["ambulance"] = {
         "weight_unit": "LB",
         "patient_weight_lbs": 175,
@@ -165,8 +165,7 @@ def test_pickup_dropoff_cr109_cr110_mode(valid_claim_data):
             "zip": "62702"
         }
     }
-    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST",
-                 use_cr1_locations=True)
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST")
 
     edi = build_837p_from_json(valid_claim_data, cfg)
 
@@ -272,10 +271,10 @@ def test_trip_number_zero_padding(valid_claim_data):
 
     edi = build_837p_from_json(valid_claim_data, cfg)
 
-    # Check CR1 segment has zero-padded trip number
-    assert "CR1*LB*150****A*DH*000000123~" in edi
+    # Check CR1 segment has CR109/CR110 format (default mode)
+    assert "CR1*LB*150*DH**A*****~" in edi
 
-    # Check NTE segment also has zero-padded trip number
+    # Check NTE segment has zero-padded trip number
     assert "TRIPNUM-000000123" in edi
 
 
@@ -452,9 +451,11 @@ def test_all_kaizen_enhancements_together(valid_claim_data):
     assert "K3*CY-Frankfort;ST-KY;ZIP-40601~" in edi
     # 3. Member group NTE
     assert "NTE*ADD*GRP-KYCD;SGR-KY11;CLS-KYRA;PLN-KYBG;PRD-KYMANC" in edi
-    # 4. Zero-padded trip number in CR1
-    assert "CR1*LB*175****A*DH*000000042~" in edi
-    # 5. Driver's licenses
+    # 4. CR1 with CR109/CR110 format (default mode)
+    assert "CR1*LB*175*DH**A*****~" in edi
+    # 5. Zero-padded trip number in NTE
+    assert "TRIPNUM-000000042" in edi
+    # 6. Driver's licenses
     assert "REF*0B*DL111111111~" in edi  # Rendering provider
     assert "REF*0B*DL555555555~" in edi  # Supervising provider
 

@@ -79,7 +79,8 @@ def test_both_levels_generates_warnings(valid_claim_data):
         usage_indicator="T",
         gs_sender_code="TEST",
         gs_receiver_code="RECV",
-        payer_config=get_payer_config("UHC_CS")
+        payer_config=get_payer_config("UHC_CS"),
+        use_cr1_locations=False  # Use legacy NTE mode to test duplicate loop detection
     )
 
     # Add pickup/dropoff at BOTH levels

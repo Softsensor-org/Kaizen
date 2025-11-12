@@ -159,7 +159,8 @@ def test_duplicate_pickup_locations_warning(valid_claim_data):
         usage_indicator="T",
         gs_sender_code="TEST",
         gs_receiver_code="RECV",
-        payer_config=get_payer_config("UHC_CS")
+        payer_config=get_payer_config("UHC_CS"),
+        use_cr1_locations=False  # Use legacy NTE mode to test duplicate loop detection
     )
 
     # Modify claim to have pickup at both levels
@@ -191,7 +192,8 @@ def test_duplicate_dropoff_locations_warning(valid_claim_data):
         usage_indicator="T",
         gs_sender_code="TEST",
         gs_receiver_code="RECV",
-        payer_config=get_payer_config("UHC_CS")
+        payer_config=get_payer_config("UHC_CS"),
+        use_cr1_locations=False  # Use legacy NTE mode to test duplicate loop detection
     )
 
     # Modify claim to have dropoff at both levels
