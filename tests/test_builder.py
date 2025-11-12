@@ -104,6 +104,87 @@ def test_trip_details_in_nte_not_cr1(valid_claim_data):
     assert "SPECNEED-" in edi
 
 
+def test_pickup_dropoff_default_nte_mode(valid_claim_data):
+    """Test default mode: pickup/dropoff in Loop 2310E/F (NTE mode)"""
+    valid_claim_data["claim"]["ambulance"] = {
+        "weight_unit": "LB",
+        "patient_weight_lbs": 175,
+        "transport_code": "A",
+        "transport_reason": "DH",
+        "trip_number": 42,
+        "pickup": {
+            "addr": "123 Main St",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62701"
+        },
+        "dropoff": {
+            "addr": "456 Hospital Rd",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62702"
+        }
+    }
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST",
+                 use_cr1_locations=False)
+
+    edi = build_837p_from_json(valid_claim_data, cfg)
+
+    # Should have CR1 with 8 elements (trip number in position 8)
+    assert "CR1*LB*175****A*DH*000000042~" in edi
+
+    # Should have Loop 2310E - Pickup Location
+    assert "NM1*PW*2" in edi
+    assert "N3*123 Main St~" in edi
+    assert "N4*Springfield*IL*62701~" in edi
+
+    # Should have Loop 2310F - Dropoff Location
+    assert "NM1*45*2" in edi
+    assert "N3*456 Hospital Rd~" in edi
+    assert "N4*Springfield*IL*62702~" in edi
+
+
+def test_pickup_dropoff_cr109_cr110_mode(valid_claim_data):
+    """Test CR109/CR110 mode: pickup/dropoff in CR1 elements per §2.1.8"""
+    valid_claim_data["claim"]["ambulance"] = {
+        "weight_unit": "LB",
+        "patient_weight_lbs": 175,
+        "transport_code": "A",
+        "transport_reason": "DH",
+        "trip_number": 42,
+        "pickup": {
+            "addr": "123 Main St",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62701"
+        },
+        "dropoff": {
+            "addr": "456 Hospital Rd",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62702"
+        }
+    }
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST",
+                 use_cr1_locations=True)
+
+    edi = build_837p_from_json(valid_claim_data, cfg)
+
+    # Should have CR1 with 10 elements including CR109/CR110
+    assert "CR1*LB*175*DH**A****123 Main St, Springfield, IL, 62701*456 Hospital Rd, Springfield, IL, 62702~" in edi
+
+    # Should NOT have Loop 2310E/F (locations are in CR1)
+    # Count NM1 segments - should only have billing provider, rendering provider, subscriber
+    # NOT pickup (PW) or dropoff (45)
+    edi_lines = edi.split("~")
+    nm1_segments = [line for line in edi_lines if line.startswith("NM1")]
+    pw_segments = [line for line in nm1_segments if "NM1*PW*2" in line]
+    dropoff_segments = [line for line in nm1_segments if "NM1*45*2" in line]
+
+    assert len(pw_segments) == 0, "Should not have Loop 2310E (PW) in CR109/CR110 mode"
+    assert len(dropoff_segments) == 0, "Should not have Loop 2310F (45) in CR109/CR110 mode"
+
+
 def test_service_level_nte_segments(valid_claim_data):
     """Test that service-level trip details are in NTE segments"""
     valid_claim_data["services"][0].update({

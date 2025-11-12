@@ -35,7 +35,7 @@ def validate_claim_json(claim_json: dict):
 class Config:
     def __init__(self, sender_qual="ZZ", sender_id="SENDERID", receiver_qual="ZZ", receiver_id="RECEIVERID",
                  usage_indicator="T", gs_sender_code="SENDER", gs_receiver_code="RECEIVER", component_sep=":",
-                 payer_config=None):
+                 payer_config=None, use_cr1_locations=False):
         self.sender_qual = sender_qual
         self.sender_id = sender_id
         self.receiver_qual = receiver_qual
@@ -45,6 +45,7 @@ class Config:
         self.gs_receiver_code = gs_receiver_code
         self.component_sep = component_sep
         self.payer_config = payer_config  # PayerConfig object for payer-specific settings
+        self.use_cr1_locations = use_cr1_locations  # Per §2.1.8: Use CR109/CR110 for pickup/dropoff in CR1 instead of NTE+Loops
 
 def _fmt_d8(s):
     if not s: return None
@@ -228,30 +229,87 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     # Ambulance/NEMT claim-level CR1
     amb = clm.get("ambulance", {})
     if amb:
-        # CR1: Ambulance Transport Information (proper X12 format)
-        # CR1-09 (Round Trip Purpose Description): Trip number zero-padded to 9 digits per Kaizen requirements
+        # CR1: Ambulance Transport Information
+        # Two modes supported:
+        # 1. NTE Mode (default): CR1 with 8 elements + separate NTE segments + Loop 2310E/F
+        # 2. CR109/CR110 Mode (§2.1.8): CR1 with 10 elements including pickup/dropoff locations
+
         trip_num = str(amb.get("trip_number", "")).zfill(9) if amb.get("trip_number") else ""
-        w.segment("CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", "", amb.get("transport_code",""), amb.get("transport_reason",""), trip_num)
 
-        # Trip details in NTE (custom UHC format - was incorrectly in CR1)
-        trip = []
-        if amb.get("trip_number") is not None: trip.append(f"TRIPNUM-{str(amb['trip_number']).zfill(9)}")
-        if amb.get("special_needs") is not None: trip.append(f"SPECNEED-{_yesno(amb['special_needs'])}")
-        if amb.get("attendant_type"): trip.append(f"ATTENDTY-{amb['attendant_type']}")
-        if amb.get("accompany_count") is not None: trip.append(f"ACCOMP-{amb['accompany_count']}")
-        if amb.get("pickup_indicator"): trip.append(f"PICKUP-{amb['pickup_indicator']}")
-        if amb.get("requested_date"): trip.append(f"TRIPREQ-{_fmt_d8(amb['requested_date'])}")
-        if trip: w.segment("NTE", "ADD", ";".join(trip))
+        if cfg.use_cr1_locations:
+            # Per §2.1.8: CR1 format with CR109/CR110 locations
+            # CR1*unit*weight*transport_reason**transport_code*reason_desc*qty*qty*CR109*CR110
 
-        # Loop 2310E - Ambulance Pick-up Location (Claim Level)
-        if amb.get("pickup"):
-            w.segment("NM1", "PW", "2"); w.segment("N3", amb["pickup"].get("addr",""))
-            w.segment("N4", amb["pickup"].get("city",""), amb["pickup"].get("state",""), amb["pickup"].get("zip",""))
+            # Format CR109 (pickup location) as single string
+            cr109 = ""
+            if amb.get("pickup"):
+                pickup = amb["pickup"]
+                parts = []
+                if pickup.get("addr"): parts.append(pickup["addr"])
+                if pickup.get("city"): parts.append(pickup["city"])
+                if pickup.get("state"): parts.append(pickup["state"])
+                if pickup.get("zip"): parts.append(pickup["zip"])
+                cr109 = ", ".join(parts) if parts else ""
 
-        # Loop 2310F - Ambulance Drop-off Location (Claim Level)
-        if amb.get("dropoff"):
-            w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
-            w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
+            # Format CR110 (dropoff location) as single string
+            cr110 = ""
+            if amb.get("dropoff"):
+                dropoff = amb["dropoff"]
+                parts = []
+                if dropoff.get("addr"): parts.append(dropoff["addr"])
+                if dropoff.get("city"): parts.append(dropoff["city"])
+                if dropoff.get("state"): parts.append(dropoff["state"])
+                if dropoff.get("zip"): parts.append(dropoff["zip"])
+                cr110 = ", ".join(parts) if parts else ""
+
+            # Build CR1 with 10 elements
+            w.segment("CR1",
+                     amb.get("weight_unit","LB"),              # CR1-01: Unit
+                     str(amb.get("patient_weight_lbs","")).replace(".0",""),  # CR1-02: Weight
+                     amb.get("transport_reason",""),           # CR1-03: Transport Reason
+                     "",                                       # CR1-04: (not used)
+                     amb.get("transport_code",""),             # CR1-05: Transport Code
+                     "",                                       # CR1-06: Reason Description
+                     "",                                       # CR1-07: Quantity
+                     "",                                       # CR1-08: Quantity
+                     cr109,                                    # CR1-09: Pickup Location
+                     cr110)                                    # CR1-10: Dropoff Location
+
+            # Trip details still in NTE (other fields not in CR1)
+            trip = []
+            if amb.get("trip_number") is not None: trip.append(f"TRIPNUM-{str(amb['trip_number']).zfill(9)}")
+            if amb.get("special_needs") is not None: trip.append(f"SPECNEED-{_yesno(amb['special_needs'])}")
+            if amb.get("attendant_type"): trip.append(f"ATTENDTY-{amb['attendant_type']}")
+            if amb.get("accompany_count") is not None: trip.append(f"ACCOMP-{amb['accompany_count']}")
+            if amb.get("pickup_indicator"): trip.append(f"PICKUP-{amb['pickup_indicator']}")
+            if amb.get("requested_date"): trip.append(f"TRIPREQ-{_fmt_d8(amb['requested_date'])}")
+            if trip: w.segment("NTE", "ADD", ";".join(trip))
+
+            # Note: Loops 2310E/F are NOT emitted in CR109/CR110 mode (locations are in CR1)
+        else:
+            # Default NTE Mode: CR1 with 8 elements + separate location loops
+            # CR1-09 (Round Trip Purpose Description): Trip number zero-padded to 9 digits per Kaizen requirements
+            w.segment("CR1", amb.get("weight_unit","LB"), str(amb.get("patient_weight_lbs","")).replace(".0",""), "", "", "", amb.get("transport_code",""), amb.get("transport_reason",""), trip_num)
+
+            # Trip details in NTE (custom UHC format - was incorrectly in CR1)
+            trip = []
+            if amb.get("trip_number") is not None: trip.append(f"TRIPNUM-{str(amb['trip_number']).zfill(9)}")
+            if amb.get("special_needs") is not None: trip.append(f"SPECNEED-{_yesno(amb['special_needs'])}")
+            if amb.get("attendant_type"): trip.append(f"ATTENDTY-{amb['attendant_type']}")
+            if amb.get("accompany_count") is not None: trip.append(f"ACCOMP-{amb['accompany_count']}")
+            if amb.get("pickup_indicator"): trip.append(f"PICKUP-{amb['pickup_indicator']}")
+            if amb.get("requested_date"): trip.append(f"TRIPREQ-{_fmt_d8(amb['requested_date'])}")
+            if trip: w.segment("NTE", "ADD", ";".join(trip))
+
+            # Loop 2310E - Ambulance Pick-up Location (Claim Level)
+            if amb.get("pickup"):
+                w.segment("NM1", "PW", "2"); w.segment("N3", amb["pickup"].get("addr",""))
+                w.segment("N4", amb["pickup"].get("city",""), amb["pickup"].get("state",""), amb["pickup"].get("zip",""))
+
+            # Loop 2310F - Ambulance Drop-off Location (Claim Level)
+            if amb.get("dropoff"):
+                w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
+                w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
 
     # Loop 2310B - Rendering Provider (Claim Level)
     # Per §2.1.1: "Rendering provider loop should be reported with Individual providers that provided the service"
