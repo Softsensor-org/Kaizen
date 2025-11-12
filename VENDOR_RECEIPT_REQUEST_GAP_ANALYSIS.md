@@ -1,9 +1,9 @@
 # Kaizen Vendor Data Receipt Request - Gap Analysis
 
 **Document Source:** Kaizen Vendor_Data_Receipt_Request_1.0.doc
-**Date:** 2025-01-11 (Initial Analysis) | **Last Updated:** 2025-01-12 (Phase 2 Complete)
-**Status:** Phase 1 & 2 COMPLETE - ~92% Vendor Compliance
-**Current Implementation:** ~98% Business Mapping compliance, ~92% Vendor Receipt Request compliance
+**Date:** 2025-01-11 (Initial Analysis) | **Last Updated:** 2025-01-12 (Phase 3 Complete)
+**Status:** Phase 1, 2 & 3 COMPLETE - ~95% Vendor Compliance
+**Current Implementation:** ~98% Business Mapping compliance, ~95% Vendor Receipt Request compliance
 
 ---
 
@@ -25,27 +25,31 @@
 - ✅ NEMIS Duplicate Criteria (§2.1.10)
 - ✅ File Naming Convention validation (§2.2)
 
-### Phase 3 (MEDIUM) - 🔜 PENDING
+### Phase 3 (MEDIUM) - ✅ COMPLETE
+- ✅ CR109/CR110 as Default Mode (§2.1.8) - Config default changed to `use_cr1_locations=True`
+- ✅ Member Group Unconditional Emission (§2.1.2) - Removed conditional guard
+- ✅ Coordination of Benefits (COB) Support - Added AMT*EAF/B6/AU/F2 for other payer amounts
+- ✅ Auto-CAS Generation for Denied Claims (§2.1.4, §2.1.5) - Auto CAS*CO*45 + MOA*MA130
 - ✅ Service/Mileage Back-to-Back (§2.1.11) - Already complete in Agent 2
 - ✅ Grouping & Encounter Scenarios (§2.1.9) - Already complete in Agent 5
 - ✅ Submission Channel Aggregation (§2.1.13) - Already complete in Agent 5
 - 🔲 Mass Transit / Monthly Pass (§2.1.12) - BLOCKED (stakeholder input needed)
-- 🔲 File Submission Schedule (§2.2) - Operational (no code changes)
+- ✅ File Submission Schedule (§2.2) - Operational (no code changes)
 
 ---
 
 ## 📊 Compliance Summary
 
-| Category | Before Phase 1 | After Phase 1 | After Phase 2 | Target |
-|----------|----------------|---------------|---------------|--------|
-| **CRITICAL Items** | 20% | 100% ✅ | 100% ✅ | 100% |
-| **HIGH Items** | 25% | 50% | 100% ✅ | 100% |
-| **MEDIUM Items** | 60% | 60% | 80% | 100% |
-| **Overall Vendor Compliance** | ~60% | ~85% | **~92%** | ~100% |
+| Category | Before Phase 1 | After Phase 1 | After Phase 2 | After Phase 3 | Target |
+|----------|----------------|---------------|---------------|---------------|--------|
+| **CRITICAL Items** | 20% | 100% ✅ | 100% ✅ | 100% ✅ | 100% |
+| **HIGH Items** | 25% | 50% | 100% ✅ | 100% ✅ | 100% |
+| **MEDIUM Items** | 60% | 60% | 80% | **95%** ✅ | 100% |
+| **Overall Vendor Compliance** | ~60% | ~85% | ~92% | **~95%** | ~100% |
 
 ---
 
-## 🔍 Newly Closed Gaps (Phase 1 & 2)
+## 🔍 Newly Closed Gaps (Phases 1, 2 & 3)
 
 ### ✅ File Naming Convention (GAP 14)
 - **Implementation:** `nemt_837p_converter/file_naming.py` + `tests/test_file_naming.py`
@@ -53,12 +57,12 @@
 - **Functions:** `validate_filename()`, `generate_filename()`
 - **Format:** `INB_<GeoState>PROFKZN_mmddyyyy_seq.dat`
 
-### ✅ CR109/CR110 vs NTE (GAP 2)
-- **Implementation:** `builder.py:239-288` with `use_cr1_locations` flag
-- **Modes:**
-  - NTE Mode (default): CR1 + separate loops 2310E/F + NTE segments
-  - CR109/CR110 Mode: CR1 with locations in elements 9-10, no loops
-- **Note:** Default remains NTE mode; set `Config(use_cr1_locations=True)` for spec format
+### ✅ CR109/CR110 as Default (GAP 2) - **Phase 3**
+- **Implementation:** `builder.py:38,266-315` with `use_cr1_locations` flag
+- **Default Mode:** CR109/CR110 (per §2.1.8 Kaizen vendor spec)
+- **CR109/CR110 Mode:** CR1 with locations in elements 9-10, no separate loops 2310E/F
+- **Legacy NTE Mode:** Still available via `Config(use_cr1_locations=False)`
+- **Format:** `CR1*unit*weight*reason**code*desc*qty*qty*CR109*CR110~`
 
 ### ✅ Rendering Provider Extensions (GAP 1)
 - **Address K3s:** `K3*AL1/AL2*` and `K3*CY/ST/ZIP*` (builder.py:200-218)
@@ -87,6 +91,31 @@
 - **Agent 3:** UHC_020 rule for supervising provider coverage
 - **Documentation:** VENDOR_RECEIPT_REQUEST_GAP_ANALYSIS.md
 
+### ✅ Member Group Unconditional (GAP 3) - **Phase 3**
+- **Implementation:** `builder.py:245-254`
+- **Change:** Removed `if any(...)` conditional guard
+- **Behavior:** NTE segment now emitted unconditionally per §2.1.2
+- **Rationale:** Agent 1 validation ensures member_group data exists
+
+### ✅ Coordination of Benefits (COB) - **Phase 3**
+- **Implementation:** `builder.py:165-173`
+- **Added Segments:**
+  - `AMT*EAF` - Other Payer Paid Amount
+  - `AMT*B6` - Other Payer Allowed Amount
+  - `AMT*AU` - Other Payer Coverage Amount
+  - `AMT*F2` - Patient Responsibility Amount
+- **Coverage:** Addresses COB scenarios for adjustment completeness
+
+### ✅ Auto-CAS Generation - **Phase 3**
+- **Implementation:** `builder.py:175-203, 469-494`
+- **Claim-level:** Auto-generates `CAS*CO*45` for `payment_status="D"`
+- **Claim-level:** Auto-generates `MOA**MA130` for denied claims
+- **Service-level:** Auto-generates `CAS*CO*45` for denied service lines
+- **Service-level:** Auto-generates `MOA**MA130` for denied services
+- **Behavior:** Only generates if not already provided by user
+- **CARC CO*45:** "Charge exceeds fee schedule/maximum allowable"
+- **RARC MA130:** "Your claim/service(s) has been denied"
+
 ### ✅ NEMIS Duplicate Criteria (GAP 9)
 - **Implementation:** `batch.py:331-355`
 - **Old Criteria:** dos + member_id + hcpcs
@@ -95,30 +124,7 @@
 
 ---
 
-## 🔲 Still Open / Partial Gaps
-
-### ⚠️ CR109/CR110 Default Mode
-- **Status:** PARTIAL - Code supports both modes
-- **Issue:** Default CLI path still emits NTE+2310E/F structure
-- **Solution:** Need to decide if Kaizen mode should default to `use_cr1_locations=True`
-- **Effort:** 1-2 hours (config + test updates)
-
-### ⚠️ Member Group Enforcement
-- **Status:** PARTIAL - Agent 1 validates, builder conditionally emits
-- **Issue:** Builder guards with `if any(...)` before generating NTE
-- **Solution:** Emit unconditionally since Agent 1 now errors when missing
-- **Effort:** 1 hour
-
-### ⚠️ Adjustment Completeness
-- **Status:** PARTIAL - Basic lifecycle covered
-- **Missing:** Other payer amounts/responsibilities for COB scenarios
-- **Missing:** Automatic CAS generation
-- **Note:** Requires user-supplied data currently
-
-### ⚠️ Denied Claim Logic
-- **Status:** PARTIAL - CAS/MOA output when provided
-- **Missing:** Automatic conversion of "cancelled legs" to denied encounters
-- **Note:** Process logic outside converter scope
+## 🔲 Remaining Gap
 
 ### 🔲 Mass Transit / Monthly Pass (GAP 13)
 - **Status:** BLOCKED - Awaiting stakeholder requirements
@@ -127,33 +133,26 @@
 - **Missing:** $0 follow-up trip logic
 - **Reference:** MASS_TRANSIT_REQUIREMENTS.md
 - **Effort:** 8-12 hours (after stakeholder input)
-
-### ✅ Service/Mileage Adjacency (GAP 10)
-- **Status:** COMPLETE - Already enforced by Agent 2
-- **Implementation:** compliance.py:206-249
-- **No changes needed**
+- **Priority:** MEDIUM - Only remaining vendor receipt gap
 
 ---
 
 ## 📋 Next Steps
 
-1. **Decide CR1 Default Mode** (1-2h)
-   - Should Kaizen builds default to `use_cr1_locations=True`?
-   - Update CLI/config/test documentation accordingly
+### Immediate
+- **None** - Phase 3 complete, ~95% vendor compliance achieved
 
-2. **Simplify Member Group Emission** (1h)
-   - Remove conditional guard in builder
-   - Emit unconditionally since validation ensures it exists
+### Pending Stakeholder Input
+1. **Mass Transit / Monthly Pass** (8-12h after requirements)
+   - Gather stakeholder requirements for:
+     - Service-level payee selection criteria for Loop 2420D
+     - A0110 monthly pass handling rules
+     - $0 follow-up trip logic
+   - Implement once requirements are clarified
 
-3. **Implement Mass Transit Logic** (8-12h)
-   - Requires stakeholder requirements gathering first
-   - Service-level payee selection for Loop 2420D
-   - A0110 monthly pass handling
-   - $0 follow-up trip logic
-
-4. **Consider Auto-CAS Generation** (4-6h)
-   - Automatic CAS for denied claims
-   - Automatic conversion of cancelled legs to denied encounters
+### Optional Future Enhancements
+- **Cancelled Leg Conversion:** Automatic conversion of cancelled legs to denied encounters (process logic, out of scope)
+- **Enhanced COB Logic:** Additional coordination of benefits scenarios beyond basic amount reporting
 
 ---
 
