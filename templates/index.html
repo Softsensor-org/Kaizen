@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEMT 837P EDI Generator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 NEMT 837P EDI Generator</h1>
+            <p class="subtitle">Generate healthcare EDI files from JSON or CSV data</p>
+        </header>
+
+        <main>
+            <!-- File Upload Section -->
+            <section class="card">
+                <h2>📁 Upload Claim Data</h2>
+
+                <div class="upload-section">
+                    <div class="form-group">
+                        <label for="fileInput">Select File:</label>
+                        <input type="file" id="fileInput" accept=".json,.csv" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fileType">File Type:</label>
+                        <select id="fileType">
+                            <option value="json">JSON</option>
+                            <option value="csv">CSV</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payerCode">Payer:</label>
+                        <select id="payerCode">
+                            <option value="UHC_CS">UnitedHealthcare Community Plan - CS</option>
+                            <option value="UHC_MD">UnitedHealthcare Community Plan - MD</option>
+                            <option value="ANTHEM_KY">Anthem Kentucky</option>
+                            <option value="ANTHEM_BCBS">Anthem Blue Cross Blue Shield</option>
+                            <option value="">Generic Payer</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usageIndicator">Mode:</label>
+                        <select id="usageIndicator">
+                            <option value="T">Test</option>
+                            <option value="P">Production</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="useCR1Locations" checked>
+                            Use CR109/CR110 Format (Kaizen Vendor Default)
+                        </label>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="validateBtn" class="btn btn-secondary">
+                            ✓ Validate Only
+                        </button>
+                        <button id="generateBtn" class="btn btn-primary">
+                            ⚡ Generate EDI
+                        </button>
+                    </div>
+                </div>
+
+                <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Processing...</p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="card" style="display: none;">
+                <h2>📊 Results</h2>
+
+                <div id="statsDisplay" class="stats-grid">
+                    <!-- Stats will be populated here -->
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="edi">EDI Output</button>
+                    <button class="tab-btn" data-tab="validation">Validation Report</button>
+                    <button class="tab-btn" data-tab="json">Parsed JSON</button>
+                </div>
+
+                <div class="tab-content">
+                    <div id="ediTab" class="tab-pane active">
+                        <div class="output-header">
+                            <h3>Generated EDI File</h3>
+                            <button id="copyEdiBtn" class="btn btn-small">📋 Copy</button>
+                            <button id="downloadEdiBtn" class="btn btn-small">💾 Download</button>
+                        </div>
+                        <pre id="ediOutput" class="code-block"></pre>
+                    </div>
+
+                    <div id="validationTab" class="tab-pane">
+                        <h3>Validation Report</h3>
+                        <pre id="validationOutput" class="code-block"></pre>
+                    </div>
+
+                    <div id="jsonTab" class="tab-pane">
+                        <h3>Parsed JSON Data</h3>
+                        <pre id="jsonOutput" class="code-block"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Display -->
+            <div id="errorDisplay" class="error-message" style="display: none;">
+                <h3>❌ Error</h3>
+                <p id="errorMessage"></p>
+                <pre id="errorDetails" style="display: none;"></pre>
+            </div>
+
+            <!-- Help Section -->
+            <section class="card help-section">
+                <h2>📖 Quick Guide</h2>
+
+                <div class="help-content">
+                    <h3>JSON Format</h3>
+                    <p>Upload a JSON file with the following structure:</p>
+                    <pre class="code-block-small">{
+  "submitter": { "name": "...", "id": "..." },
+  "receiver": { "payer_name": "...", "payer_id": "..." },
+  "billing_provider": { "npi": "...", "name": "..." },
+  "subscriber": { "member_id": "...", "name": {...} },
+  "claim": { "clm_number": "...", "total_charge": 100.00, ... },
+  "services": [{ "hcpcs": "A0130", "charge": 100.00, ... }]
+}</pre>
+
+                    <h3>CSV Format</h3>
+                    <p>Upload a CSV file with columns:</p>
+                    <ul>
+                        <li><strong>Required:</strong> member_id, member_first, member_last, member_dob, member_gender</li>
+                        <li><strong>Required:</strong> dos, hcpcs, charge, units</li>
+                        <li><strong>Required:</strong> billing_npi, billing_name, payer_name, payer_id</li>
+                        <li><strong>Optional:</strong> rendering_npi, supervising_npi, pickup_addr, transport_code, etc.</li>
+                    </ul>
+
+                    <div class="button-group">
+                        <a href="/static/examples/sample.json" download class="btn btn-small">📥 Sample JSON</a>
+                        <a href="/static/examples/sample.csv" download class="btn btn-small">📥 Sample CSV</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Kaizen NEMT 837P Converter v1.0 | ~95% Vendor Compliance</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

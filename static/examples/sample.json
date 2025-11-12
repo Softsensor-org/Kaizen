@@ -1,0 +1,104 @@
+{
+  "submitter": {
+    "name": "Kaizen Health Services",
+    "id": "KAIZEN01",
+    "contact": "Claims Department",
+    "phone": "5555551234"
+  },
+  "receiver": {
+    "payer_name": "UNITED HEALTHCARE COMMUNITY",
+    "payer_id": "87726"
+  },
+  "billing_provider": {
+    "npi": "1234567890",
+    "name": "ABC Transport Services",
+    "taxonomy": "343900000X",
+    "address": {
+      "line1": "123 Main Street",
+      "city": "Louisville",
+      "state": "KY",
+      "zip": "40202"
+    },
+    "tax_id": "123456789"
+  },
+  "rendering_provider": {
+    "npi": "9876543210",
+    "last": "Smith",
+    "first": "John",
+    "address_line1": "456 Provider Lane",
+    "city": "Lexington",
+    "state": "KY",
+    "zip": "40507"
+  },
+  "subscriber": {
+    "member_id": "MEM123456789",
+    "name": {
+      "last": "Johnson",
+      "first": "Mary"
+    },
+    "dob": "1985-03-15",
+    "gender": "F",
+    "address": {
+      "line1": "789 Patient Road",
+      "city": "Frankfort",
+      "state": "KY",
+      "zip": "40601"
+    }
+  },
+  "claim": {
+    "clm_number": "CLM20260115001",
+    "from": "2026-01-15",
+    "to": "2026-01-15",
+    "pos": "41",
+    "frequency": "1",
+    "total_charge": 150.00,
+    "network_indicator": "I",
+    "authorization_number": "AUTH123456",
+    "member_group": {
+      "group_id": "KYUHC001",
+      "sub_group_id": "KYSUB01",
+      "class_id": "KYCLASS1",
+      "plan_id": "KYPLAN01",
+      "product_id": "KYPROD01"
+    },
+    "ambulance": {
+      "transport_code": "A",
+      "transport_reason": "DH",
+      "patient_weight_lbs": 180,
+      "weight_unit": "LB",
+      "trip_number": 123,
+      "pickup": {
+        "addr": "789 Patient Road",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40601"
+      },
+      "dropoff": {
+        "addr": "100 Hospital Drive",
+        "city": "Frankfort",
+        "state": "KY",
+        "zip": "40602"
+      }
+    }
+  },
+  "services": [
+    {
+      "hcpcs": "A0130",
+      "modifiers": ["EH"],
+      "charge": 100.00,
+      "units": 1,
+      "dos": "2026-01-15",
+      "pos": "41",
+      "emergency": false
+    },
+    {
+      "hcpcs": "A0425",
+      "modifiers": ["EH"],
+      "charge": 50.00,
+      "units": 10,
+      "dos": "2026-01-15",
+      "pos": "41",
+      "emergency": false
+    }
+  ]
+}
