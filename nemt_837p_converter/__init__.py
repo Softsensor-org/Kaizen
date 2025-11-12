@@ -24,6 +24,7 @@ from .codes import (
     TRIP_TYPES, TRIP_LEGS, NETWORK_INDICATORS, SUBMISSION_CHANNELS,
     PAYMENT_STATUS_CODES
 )
+from .file_naming import validate_filename, generate_filename
 
 __all__ = [
     "build_837p_from_json", "Config", "ControlNumbers", "ValidationError",
@@ -40,5 +41,6 @@ __all__ = [
     "POS_CODES", "NEMT_HCPCS_CODES", "HCPCS_MODIFIERS", "FREQUENCY_CODES",
     "TRANSPORT_CODES", "TRANSPORT_REASON_CODES", "WEIGHT_UNITS", "GENDER_CODES",
     "TRIP_TYPES", "TRIP_LEGS", "NETWORK_INDICATORS", "SUBMISSION_CHANNELS",
-    "PAYMENT_STATUS_CODES"
+    "PAYMENT_STATUS_CODES",
+    "validate_filename", "generate_filename"
 ]

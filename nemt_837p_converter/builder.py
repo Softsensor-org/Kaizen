@@ -311,6 +311,25 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
                 w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
                 w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
 
+    # Loop 2310A - Referring Provider (Claim Level)
+    # Per §2.1.1: "Referring provider loop should be reported if data is available for the claim"
+    ref_prov = claim_json.get("referring_provider", {})
+    if ref_prov.get("last") or ref_prov.get("first") or ref_prov.get("npi"):
+        ref_last = ref_prov.get("last", "")
+        ref_first = ref_prov.get("first", "")
+        ref_qualifier = ref_prov.get("qualifier", "DN")  # DN = Referring Provider, P3 = Primary Care Provider
+
+        if ref_prov.get("npi"):
+            # Referring provider with NPI
+            w.segment("NM1", ref_qualifier, "1", ref_last, ref_first, "", "", "", "XX", ref_prov["npi"])
+        else:
+            # Referring provider without NPI
+            w.segment("NM1", ref_qualifier, "1", ref_last, ref_first)
+
+        # REF*G2 - Secondary ID (state Medicaid ID if no NPI)
+        if ref_prov.get("state_medicaid_id"):
+            w.segment("REF", "G2", ref_prov["state_medicaid_id"])
+
     # Loop 2310B - Rendering Provider (Claim Level)
     # Per §2.1.1: "Rendering provider loop should be reported with Individual providers that provided the service"
     # "If the provider cannot be enrolled with State (like for Meals/Lodging/Air transport), then submit the claim by rendering provider as Kaizen"

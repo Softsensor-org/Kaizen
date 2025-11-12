@@ -457,3 +457,48 @@ def test_all_kaizen_enhancements_together(valid_claim_data):
     # 5. Driver's licenses
     assert "REF*0B*DL111111111~" in edi  # Rendering provider
     assert "REF*0B*DL555555555~" in edi  # Supervising provider
+
+
+def test_referring_provider_loop_2310a(valid_claim_data):
+    """Test Loop 2310A - Referring Provider per §2.1.1"""
+    valid_claim_data["referring_provider"] = {
+        "npi": "9876543210",
+        "last": "Johnson",
+        "first": "Mary",
+        "qualifier": "DN"  # Referring Provider
+    }
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST")
+
+    edi = build_837p_from_json(valid_claim_data, cfg)
+
+    # Should have Loop 2310A with NM1*DN*1 (Referring Provider)
+    assert "NM1*DN*1*Johnson*Mary****XX*9876543210~" in edi
+
+
+def test_referring_provider_pcp_variant(valid_claim_data):
+    """Test Loop 2310A with P3 qualifier (Primary Care Provider)"""
+    valid_claim_data["referring_provider"] = {
+        "last": "Smith",
+        "first": "John",
+        "qualifier": "P3",  # Primary Care Provider
+        "state_medicaid_id": "PCP12345"
+    }
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST")
+
+    edi = build_837p_from_json(valid_claim_data, cfg)
+
+    # Should have Loop 2310A with NM1*P3*1 (PCP) and REF*G2
+    assert "NM1*P3*1*Smith*John~" in edi
+    assert "REF*G2*PCP12345~" in edi
+
+
+def test_no_referring_provider_omits_loop(valid_claim_data):
+    """Test that Loop 2310A is omitted when no referring provider data"""
+    # Don't add referring_provider to claim_data
+    cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST")
+
+    edi = build_837p_from_json(valid_claim_data, cfg)
+
+    # Should NOT have Loop 2310A
+    assert "NM1*DN*1" not in edi
+    assert "NM1*P3*1" not in edi

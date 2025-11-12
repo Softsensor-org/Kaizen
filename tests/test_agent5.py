@@ -268,24 +268,24 @@ def test_submission_channel_aggregation_all_paper(common_data, sample_member):
 
 
 def test_duplicate_claim_validation_detects_duplicates(common_data, sample_member):
-    """Test that duplicate claims are detected"""
-    # Create two trips that would generate claims with same CLM01, CLM05-3, REF*F8
+    """Test that duplicate claims are detected per NEMIS criteria (§2.1.10)"""
+    # Create two trips that would generate claims with same CLM01, CLM05-3, REF*F8 (original_claim_number)
     trips = [
         {
             "dos": "2026-01-01",
             "member": sample_member,
             "rendering_provider": {"npi": "9876543210"},
             "service": {"hcpcs": "T2005", "charge": 50.00, "units": 1},
-            "patient_account": "PA12345",
-            "frequency_code": "1"
+            "original_claim_number": "ORIG-001",  # Per §2.1.10, REF*F8 is original claim number
+            "frequency_code": "7"  # Replacement claim
         },
         {
             "dos": "2026-01-02",
             "member": sample_member,
             "rendering_provider": {"npi": "8888888888"},  # Different provider → separate claim
             "service": {"hcpcs": "T2005", "charge": 50.00, "units": 1},
-            "patient_account": "PA12345",  # Same patient_account
-            "frequency_code": "1"  # Same frequency
+            "original_claim_number": "ORIG-001",  # Same original claim number
+            "frequency_code": "7"  # Same frequency (replacement)
         }
     ]
 
@@ -303,7 +303,7 @@ def test_duplicate_claim_validation_detects_duplicates(common_data, sample_membe
     processor._validate_duplicates(claims)
 
     dup_errors = [e for e in processor.report.errors if e.code == "BATCH_010"]
-    assert len(dup_errors) > 0, "Should detect duplicate claims"
+    assert len(dup_errors) > 0, "Should detect duplicate claims per NEMIS criteria"
 
 
 def test_mileage_back_to_back_validation_correct_order(common_data, sample_member):

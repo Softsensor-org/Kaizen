@@ -114,6 +114,9 @@ class UHCBusinessRuleValidator:
         # Validate authorization
         self._validate_authorization(claim_json)
 
+        # Validate supervising provider requirements
+        self._validate_supervising_provider(claim_json)
+
         return self.report
 
     def _validate_nemt_requirements(self, claim_json: dict):
@@ -334,6 +337,38 @@ class UHCBusinessRuleValidator:
                 expected="Provider's patient account number",
                 actual="Missing"
             ))
+
+    def _validate_supervising_provider(self, claim_json: dict):
+        """Validate supervising provider requirements per §2.1.1"""
+        services = claim_json.get("services", [])
+        clm = claim_json.get("claim", {})
+
+        # HCPCS codes that require supervising provider per §2.1.1
+        codes_requiring_supervising = {
+            "A0090", "A0110", "A0120", "A0140", "A0160", "A0170",
+            "A0180", "A0190", "A0200", "A0210", "A0100", "T2001"
+        }
+
+        # Check each service line
+        for idx, svc in enumerate(services):
+            hcpcs = svc.get("hcpcs", "")
+            if hcpcs in codes_requiring_supervising:
+                # Check for supervising provider at service level or claim level
+                has_supervising = (
+                    svc.get("supervising_provider") or
+                    clm.get("supervising_provider")
+                )
+
+                if not has_supervising:
+                    self.report.add_violation(UHCRuleViolation(
+                        severity=UHCRuleSeverity.ERROR,
+                        code="UHC_020",
+                        message=f"HCPCS code {hcpcs} requires supervising or attendant provider per §2.1.1",
+                        rule_name="Supervising Provider Required",
+                        field_path=f"services[{idx}].supervising_provider",
+                        expected="Supervising provider data (NPI, name)",
+                        actual="Missing"
+                    ))
 
 
 def validate_uhc_business_rules(claim_json: dict) -> UHCReport:

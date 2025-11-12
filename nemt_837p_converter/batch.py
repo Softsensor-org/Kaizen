@@ -330,25 +330,25 @@ class BatchProcessor:
 
     def _validate_duplicates(self, claims: List[Dict[str, Any]]):
         """
-        Validate for duplicate claims using:
+        Validate for duplicate claims using NEMIS criteria per §2.1.10:
         - CLM01 (claim number)
         - CLM05-3 (frequency code)
-        - REF*F8 (patient account)
+        - REF*F8 (original claim number for adjustments)
         """
         seen_combinations: Set[Tuple[str, str, str]] = set()
 
         for i, claim in enumerate(claims):
             clm_number = claim.get("claim", {}).get("clm_number", "")
-            freq_code = claim.get("claim", {}).get("frequency_code", "")
-            patient_account = claim.get("claim", {}).get("patient_account", "")
+            freq_code = claim.get("claim", {}).get("frequency_code", "1")  # Default to "1" (original)
+            original_claim = claim.get("claim", {}).get("original_claim_number", "")  # Per §2.1.10, REF*F8 is original claim number
 
-            combo = (clm_number, freq_code, patient_account)
+            combo = (clm_number, freq_code, original_claim)
 
             if combo in seen_combinations:
                 self.report.add_issue(BatchIssue(
                     severity=BatchSeverity.ERROR,
                     code="BATCH_010",
-                    message=f"Duplicate claim detected: CLM01={clm_number}, CLM05-3={freq_code}, REF*F8={patient_account}",
+                    message=f"Duplicate claim detected per NEMIS criteria (§2.1.10): CLM01={clm_number}, CLM05-3={freq_code}, REF*F8={original_claim}",
                     field_path=f"claims[{i}]"
                 ))
 

@@ -466,3 +466,71 @@ def test_location_at_service_level_satisfies_uhc_012(valid_claim_data):
     # Should not have UHC_012 warning for this service
     uhc_012_warnings = [w for w in report.warnings if w.code == "UHC_012"]
     assert len(uhc_012_warnings) == 0
+
+
+def test_uhc_020_supervising_provider_required_for_specific_codes(valid_claim_data):
+    """Test UHC_020: Supervising provider required for specific HCPCS codes per §2.1.1"""
+    # Use A0110 which requires supervising provider
+    valid_claim_data["services"][0]["hcpcs"] = "A0110"
+    
+    # Remove any supervising provider
+    valid_claim_data["claim"].pop("supervising_provider", None)
+    valid_claim_data["services"][0].pop("supervising_provider", None)
+    
+    validator = UHCBusinessRuleValidator()
+    report = validator.validate_claim(valid_claim_data)
+    
+    assert report.is_compliant is False
+    errors = [e for e in report.errors if e.code == "UHC_020"]
+    assert len(errors) == 1
+    assert "A0110" in errors[0].message
+    assert "supervising" in errors[0].message.lower()
+
+
+def test_uhc_020_passes_with_claim_level_supervising_provider(valid_claim_data):
+    """Test UHC_020: Passes when supervising provider at claim level"""
+    valid_claim_data["services"][0]["hcpcs"] = "A0110"
+    valid_claim_data["claim"]["supervising_provider"] = {
+        "npi": "1234567890",
+        "last": "Smith",
+        "first": "John"
+    }
+    
+    validator = UHCBusinessRuleValidator()
+    report = validator.validate_claim(valid_claim_data)
+    
+    # Should not have UHC_020 error
+    errors = [e for e in report.errors if e.code == "UHC_020"]
+    assert len(errors) == 0
+
+
+def test_uhc_020_passes_with_service_level_supervising_provider(valid_claim_data):
+    """Test UHC_020: Passes when supervising provider at service level"""
+    valid_claim_data["services"][0]["hcpcs"] = "A0110"
+    valid_claim_data["services"][0]["supervising_provider"] = {
+        "npi": "9876543210",
+        "last": "Doe",
+        "first": "Jane"
+    }
+    
+    validator = UHCBusinessRuleValidator()
+    report = validator.validate_claim(valid_claim_data)
+    
+    # Should not have UHC_020 error
+    errors = [e for e in report.errors if e.code == "UHC_020"]
+    assert len(errors) == 0
+
+
+def test_uhc_020_not_required_for_other_codes(valid_claim_data):
+    """Test UHC_020: Not required for codes not in the list"""
+    valid_claim_data["services"][0]["hcpcs"] = "A0130"  # Not in required list
+    
+    # Remove supervising provider
+    valid_claim_data["claim"].pop("supervising_provider", None)
+    
+    validator = UHCBusinessRuleValidator()
+    report = validator.validate_claim(valid_claim_data)
+    
+    # Should not have UHC_020 error
+    errors = [e for e in report.errors if e.code == "UHC_020"]
+    assert len(errors) == 0
