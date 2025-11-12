@@ -57,7 +57,15 @@ def valid_claim_data():
             "icd10": ["R99"],
             "from": "2026-01-01",
             "to": "2026-01-01",
-            "frequency_code": "1"
+            "frequency_code": "1",
+            "member_group": {
+                "group_id": "TESTGRP",
+                "sub_group_id": "TESTSUB",
+                "class_id": "TESTCLS",
+                "plan_id": "TESTPLN",
+                "product_id": "TESTPRD"
+            },
+            "rendering_network_indicator": "I"
         },
         "services": [
             {
@@ -105,7 +113,15 @@ def minimal_claim_data():
         "claim": {
             "clm_number": "TEST-001",
             "total_charge": 100.0,
-            "from": "2026-01-01"
+            "from": "2026-01-01",
+            "member_group": {
+                "group_id": "TESTGRP",
+                "sub_group_id": "TESTSUB",
+                "class_id": "TESTCLS",
+                "plan_id": "TESTPLN",
+                "product_id": "TESTPRD"
+            },
+            "rendering_network_indicator": "I"
         },
         "services": [
             {
@@ -151,6 +167,7 @@ def replacement_claim_data(valid_claim_data):
     data = valid_claim_data.copy()
     data["claim"]["frequency_code"] = "7"
     data["claim"]["tracking_number"] = "TRK-001-R1"
+    data["claim"]["original_claim_number"] = "ORIG-001"  # Required for adjustments per §2.1.6
     return data
 
 
@@ -160,6 +177,7 @@ def void_claim_data(valid_claim_data):
     data = valid_claim_data.copy()
     data["claim"]["frequency_code"] = "8"
     data["claim"]["total_charge"] = 0.0
+    data["claim"]["original_claim_number"] = "ORIG-001"  # Required for adjustments per §2.1.6
     data["services"][0]["charge"] = 0.0
     data["services"][0]["units"] = 0
     return data

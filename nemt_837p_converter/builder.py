@@ -141,6 +141,38 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if clm.get("tracking_number"): w.segment("REF", "D9", clm["tracking_number"])
     if clm.get("patient_account"): w.segment("REF", "F8", clm["patient_account"])
 
+    # Per §2.1.6: Adjustment Reporting - REF*F8 with original claim number for void/replacement
+    if freq in ("7", "8") and clm.get("original_claim_number"):
+        w.segment("REF", "F8", clm["original_claim_number"])
+
+    # Per §2.1.7: Payment Date Reporting
+    if clm.get("receipt_date"):
+        w.segment("DTP", "050", "D8", _fmt_d8(clm["receipt_date"]))  # Date of Receipt
+    if clm.get("adjudication_date"):
+        w.segment("DTP", "036", "D8", _fmt_d8(clm["adjudication_date"]))  # Date of Adjudication
+    if clm.get("paid_date"):
+        w.segment("DTP", "573", "D8", _fmt_d8(clm["paid_date"]))  # Date of Payment
+
+    # Per §2.1.7: Payment Amount Reporting
+    if clm.get("allowed_amount") is not None:
+        w.segment("AMT", "D", f"{float(clm['allowed_amount']):.2f}")  # Approved/Allowed Amount
+    if clm.get("not_covered_amount") is not None:
+        w.segment("AMT", "A8", f"{float(clm['not_covered_amount']):.2f}")  # Not Covered Amount
+    if clm.get("patient_amount_paid") is not None:
+        w.segment("AMT", "F5", f"{float(clm['patient_amount_paid']):.2f}")  # Patient Amount Paid
+
+    # Per §2.1.5: Adjustment Reason Codes - CAS segments at claim level
+    if clm.get("cas_segments"):
+        for cas in clm["cas_segments"]:
+            # CAS format: CAS*group_code*reason_code*amount*quantity~
+            w.segment("CAS", cas.get("group_code"), cas.get("reason_code"),
+                     f"{float(cas.get('amount', 0)):.2f}" if cas.get("amount") else "",
+                     str(cas.get("quantity", "")) if cas.get("quantity") else "")
+
+    # Per §2.1.4: Denied Claims - MOA segment for RARC codes
+    if clm.get("remittance_advice_code"):
+        w.segment("MOA", "", clm["remittance_advice_code"])
+
     # K3 occurrences: PYMS; SUB/IPAD/USER; SNWK; TRPN-ASPUFE*; DREC/DADJ/PAIDDT
     if clm.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{clm['payment_status']}")
     if clm.get("subscriber_internal_id") or clm.get("ip_address") or clm.get("user_id"):
@@ -222,30 +254,47 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
 
     # Loop 2310B - Rendering Provider (Claim Level)
+    # Per §2.1.1: "Rendering provider loop should be reported with Individual providers that provided the service"
+    # "If the provider cannot be enrolled with State (like for Meals/Lodging/Air transport), then submit the claim by rendering provider as Kaizen"
     rend = claim_json.get("rendering_provider", {})
-    if rend.get("npi") or rend.get("last") or rend.get("first"):
-        rend_name = rend.get("name", {})
-        if rend_name and isinstance(rend_name, dict):
-            last = rend_name.get("last", "")
-            first = rend_name.get("first", "")
-        else:
-            last = rend.get("last", "")
-            first = rend.get("first", "")
 
-        if rend.get("npi"):
-            # Provider with NPI
-            w.segment("NM1", "82", "1", last, first, "", "", "", "XX", rend["npi"])
-        else:
-            # Atypical provider without NPI
-            w.segment("NM1", "82", "1", last, first)
+    # If no rendering provider data, use Kaizen (billing provider) as fallback per §2.1.1
+    if not (rend.get("npi") or rend.get("last") or rend.get("first")):
+        rend = {
+            "npi": bp["npi"],
+            "name": bp["name"],
+            "taxonomy": bp.get("taxonomy")
+        }
 
-        # REF*G2 - Atypical Provider ID (state Medicaid ID if no NPI)
-        if rend.get("atypical_id"):
-            w.segment("REF", "G2", rend["atypical_id"])
+    # Extract name
+    rend_name = rend.get("name", {})
+    if rend_name and isinstance(rend_name, dict):
+        last = rend_name.get("last", "")
+        first = rend_name.get("first", "")
+    else:
+        # If name is a string (Kaizen fallback case)
+        last = rend.get("name", "") if isinstance(rend.get("name"), str) else rend.get("last", "")
+        first = rend.get("first", "")
 
-        # REF*0B - Driver's License (Kaizen requirement for NEMT providers)
-        if rend.get("driver_license"):
-            w.segment("REF", "0B", rend["driver_license"])
+    # NM1 segment
+    if rend.get("npi"):
+        # Provider with NPI
+        w.segment("NM1", "82", "1", last, first, "", "", "", "XX", rend["npi"])
+    else:
+        # Atypical provider without NPI
+        w.segment("NM1", "82", "1", last, first)
+
+    # PRV segment - Taxonomy (MANDATORY per §2.1.1: "Taxonomy should always be reported for rendering providers")
+    if rend.get("taxonomy"):
+        w.segment("PRV", "PE", "PXC", rend["taxonomy"])
+
+    # REF*G2 - Atypical Provider ID (state Medicaid ID if no NPI)
+    if rend.get("atypical_id"):
+        w.segment("REF", "G2", rend["atypical_id"])
+
+    # REF*0B - Driver's License (Kaizen requirement for NEMT providers)
+    if rend.get("driver_license"):
+        w.segment("REF", "0B", rend["driver_license"])
 
     # Loop 2310C - Service Facility Location (Claim Level)
     svc_fac = clm.get("service_facility", {})
@@ -312,6 +361,18 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
 
         # K3 - Line-level payment status (must be at 2400 level, before 2420 provider loops)
         if svc.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{svc['payment_status']}")
+
+        # Per §2.1.4: Service-level CAS segments for denied service lines
+        if svc.get("cas_segments"):
+            for cas in svc["cas_segments"]:
+                # CAS format: CAS*group_code*reason_code*amount*quantity~
+                w.segment("CAS", cas.get("group_code"), cas.get("reason_code"),
+                         f"{float(cas.get('amount', 0)):.2f}" if cas.get("amount") else "",
+                         str(cas.get("quantity", "")) if cas.get("quantity") else "")
+
+        # Per §2.1.4: Service-level MOA segment for RARC codes
+        if svc.get("remittance_advice_code"):
+            w.segment("MOA", "", svc["remittance_advice_code"])
 
         # Loop 2420D - Supervising Provider (Service Line Level)
         if svc.get("supervising_provider"):

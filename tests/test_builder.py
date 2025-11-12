@@ -356,7 +356,8 @@ def test_all_kaizen_enhancements_together(valid_claim_data):
         "group_id": "KYCD",
         "sub_group_id": "KY11",
         "class_id": "KYRA",
-        "plan_id": "KYBG"
+        "plan_id": "KYBG",
+        "product_id": "KYMANC"
     }
     cfg = Config(sender_id="TEST", receiver_id="TEST", gs_sender_code="TEST", gs_receiver_code="TEST")
 
@@ -369,7 +370,7 @@ def test_all_kaizen_enhancements_together(valid_claim_data):
     assert "K3*AL1-789 Elm Street~" in edi
     assert "K3*CY-Frankfort;ST-KY;ZIP-40601~" in edi
     # 3. Member group NTE
-    assert "NTE*ADD*GRP-KYCD;SGR-KY11;CLS-KYRA;PLN-KYBG" in edi
+    assert "NTE*ADD*GRP-KYCD;SGR-KY11;CLS-KYRA;PLN-KYBG;PRD-KYMANC" in edi
     # 4. Zero-padded trip number in CR1
     assert "CR1*LB*175****A*DH*000000042~" in edi
     # 5. Driver's licenses

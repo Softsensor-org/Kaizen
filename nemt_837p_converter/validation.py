@@ -407,6 +407,55 @@ class PreSubmissionValidator:
                     actual=clm["frequency_code"]
                 ))
 
+        # Per §2.1.2: Member Group Structure - MANDATORY for every claim
+        if not clm.get("member_group"):
+            self.report.add_issue(ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="VAL_039",
+                message="claim.member_group is required per §2.1.2 (must be reported for every claim)",
+                field_path="claim.member_group"
+            ))
+        else:
+            # Validate all 5 required fields
+            mg = clm["member_group"]
+            required_fields = ["group_id", "sub_group_id", "class_id", "plan_id", "product_id"]
+            for field_name in required_fields:
+                if not mg.get(field_name):
+                    self.report.add_issue(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="VAL_039",
+                        message=f"claim.member_group.{field_name} is required per §2.1.2",
+                        field_path=f"claim.member_group.{field_name}"
+                    ))
+
+        # Per §2.1.1: Rendering Provider Network Indicator - MANDATORY
+        if not clm.get("rendering_network_indicator"):
+            self.report.add_issue(ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="VAL_060",
+                message="claim.rendering_network_indicator is required per §2.1.1 (I or O)",
+                field_path="claim.rendering_network_indicator"
+            ))
+        elif clm["rendering_network_indicator"] not in ("I", "O"):
+            self.report.add_issue(ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="VAL_061",
+                message="claim.rendering_network_indicator must be 'I' (In-Network) or 'O' (Out-of-Network)",
+                field_path="claim.rendering_network_indicator",
+                expected="I or O",
+                actual=clm["rendering_network_indicator"]
+            ))
+
+        # Per §2.1.6: Adjustment claims must have original_claim_number
+        freq = clm.get("frequency_code")
+        if freq in ("7", "8") and not clm.get("original_claim_number"):
+            self.report.add_issue(ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="VAL_062",
+                message="claim.original_claim_number is required for adjustment claims (frequency 7 or 8)",
+                field_path="claim.original_claim_number"
+            ))
+
     def _validate_services(self, services: List[dict]):
         """Validate service line data"""
         if not services:

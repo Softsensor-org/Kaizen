@@ -305,6 +305,11 @@ def test_valid_frequency_codes(valid_claim_data):
     # Valid frequency codes are 1, 6, 7, 8
     for freq in ["1", "6", "7", "8"]:
         valid_claim_data["claim"]["frequency_code"] = freq
+        # Per §2.1.6, frequency 7 and 8 require original_claim_number
+        if freq in ("7", "8"):
+            valid_claim_data["claim"]["original_claim_number"] = "ORIG-001"
+        else:
+            valid_claim_data["claim"].pop("original_claim_number", None)
         report = validator.validate_claim(valid_claim_data)
         assert report.is_valid is True, f"Frequency code {freq} should be valid"
 
