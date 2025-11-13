@@ -313,6 +313,24 @@ class BatchProcessor:
             if first_trip.get("subscriber_internal_id"):
                 claim["claim"]["subscriber_internal_id"] = first_trip["subscriber_internal_id"]
 
+            # Phase 3: Payment/lifecycle fields
+            if first_trip.get("payment_status"):
+                claim["claim"]["payment_status"] = first_trip["payment_status"]
+            if first_trip.get("received_date"):
+                claim["claim"]["received_date"] = first_trip["received_date"]
+            if first_trip.get("receipt_date"):  # Alternate field name
+                claim["claim"]["receipt_date"] = first_trip["receipt_date"]
+            if first_trip.get("adjudication_date"):
+                claim["claim"]["adjudication_date"] = first_trip["adjudication_date"]
+            if first_trip.get("paid_date"):
+                claim["claim"]["paid_date"] = first_trip["paid_date"]
+            if first_trip.get("allowed_amount") is not None:
+                claim["claim"]["allowed_amount"] = first_trip["allowed_amount"]
+            if first_trip.get("not_covered_amount") is not None:
+                claim["claim"]["not_covered_amount"] = first_trip["not_covered_amount"]
+            if first_trip.get("patient_paid_amount") is not None:
+                claim["claim"]["patient_paid_amount"] = first_trip["patient_paid_amount"]
+
             # Rendering provider (if different from billing)
             if first_trip.get("rendering_provider"):
                 claim["rendering_provider"] = first_trip["rendering_provider"]

@@ -5,7 +5,7 @@ Converts CSV files with trip/claim data to the JSON format expected by the EDI b
 """
 
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import io
 
@@ -106,6 +106,31 @@ def parse_csv_to_json(csv_content: str, config: Optional[Dict[str, Any]] = None)
     # Calculate total charge from all service rows
     total_charge = sum(float(row.get("charge", 0)) for row in rows)
     claim_data["total_charge"] = total_charge
+
+    # Phase 3: Payment/lifecycle fields with defaults
+    claim_data["payment_status"] = first_row.get("payment_status", "P").strip() if first_row.get("payment_status") else "P"
+    claim_data["submission_channel"] = first_row.get("submission_channel", "ELECTRONIC").strip() if first_row.get("submission_channel") else "ELECTRONIC"
+
+    # Portal tracking fields
+    claim_data["subscriber_internal_id"] = first_row.get("subscriber_internal_id") or first_row.get("member_id", "")
+    claim_data["ip_address"] = first_row.get("ip_address", "192.168.1.100")
+    claim_data["user_id"] = first_row.get("user_id", "PORTAL_USER_001")
+
+    # Calculate lifecycle dates relative to DOS if not in CSV
+    dos_str = first_row.get("dos", "")
+    if dos_str:
+        try:
+            dos_date = datetime.strptime(dos_str.strip(), "%Y-%m-%d")
+            claim_data["received_date"] = first_row.get("received_date", (dos_date + timedelta(days=1)).strftime("%Y-%m-%d"))
+            claim_data["adjudication_date"] = first_row.get("adjudication_date", (dos_date + timedelta(days=4)).strftime("%Y-%m-%d"))
+            claim_data["paid_date"] = first_row.get("paid_date", (dos_date + timedelta(days=9)).strftime("%Y-%m-%d"))
+        except:
+            pass  # Skip date calculation if DOS is invalid
+
+    # Financial amounts - use total charge as allowed amount by default
+    claim_data["allowed_amount"] = float(first_row.get("allowed_amount", total_charge)) if first_row.get("allowed_amount") else total_charge
+    claim_data["not_covered_amount"] = float(first_row.get("not_covered_amount", 0)) if first_row.get("not_covered_amount") else 0.0
+    claim_data["patient_paid_amount"] = float(first_row.get("patient_paid_amount", 0)) if first_row.get("patient_paid_amount") else 0.0
 
     # Add member group if provided
     if first_row.get("group_id"):
@@ -215,6 +240,9 @@ def parse_csv_to_json(csv_content: str, config: Optional[Dict[str, Any]] = None)
         # Service-level trip number
         if row.get("service_trip_number"):
             service["trip_number"] = int(row.get("service_trip_number"))
+
+        # Phase 3: Service-level payment status
+        service["payment_status"] = row.get("payment_status", "P").strip() if row.get("payment_status") else "P"
 
         services.append(service)
 

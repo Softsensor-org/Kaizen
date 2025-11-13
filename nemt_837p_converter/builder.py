@@ -146,31 +146,8 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
     if freq in ("7", "8") and clm.get("original_claim_number"):
         w.segment("REF", "F8", clm["original_claim_number"])
 
-    # Per §2.1.7: Payment Date Reporting
-    if clm.get("receipt_date"):
-        w.segment("DTP", "050", "D8", _fmt_d8(clm["receipt_date"]))  # Date of Receipt
-    if clm.get("adjudication_date"):
-        w.segment("DTP", "036", "D8", _fmt_d8(clm["adjudication_date"]))  # Date of Adjudication
-    if clm.get("paid_date"):
-        w.segment("DTP", "573", "D8", _fmt_d8(clm["paid_date"]))  # Date of Payment
-
-    # Per §2.1.7: Payment Amount Reporting
-    if clm.get("allowed_amount") is not None:
-        w.segment("AMT", "D", f"{float(clm['allowed_amount']):.2f}")  # Approved/Allowed Amount
-    if clm.get("not_covered_amount") is not None:
-        w.segment("AMT", "A8", f"{float(clm['not_covered_amount']):.2f}")  # Not Covered Amount
-    if clm.get("patient_amount_paid") is not None:
-        w.segment("AMT", "F5", f"{float(clm['patient_amount_paid']):.2f}")  # Patient Amount Paid
-
-    # Coordination of Benefits (COB) - Other Payer Amounts
-    if clm.get("other_payer_paid_amount") is not None:
-        w.segment("AMT", "EAF", f"{float(clm['other_payer_paid_amount']):.2f}")  # Other Payer - Primary/Secondary Amount Paid
-    if clm.get("other_payer_allowed_amount") is not None:
-        w.segment("AMT", "B6", f"{float(clm['other_payer_allowed_amount']):.2f}")  # Other Payer - Allowed Amount
-    if clm.get("other_payer_coverage_amount") is not None:
-        w.segment("AMT", "AU", f"{float(clm['other_payer_coverage_amount']):.2f}")  # Other Payer - Coverage Amount
-    if clm.get("patient_responsibility_amount") is not None:
-        w.segment("AMT", "F2", f"{float(clm['patient_responsibility_amount']):.2f}")  # Patient Responsibility Amount
+    # Note: DTP and AMT segments moved to Phase 3 section after CR1 (lines 361-395)
+    # This provides proper ordering per §2.1.7: Payment Date/Amount Reporting
 
     # Per §2.1.5: Adjustment Reason Codes - CAS segments at claim level
     # Auto-generate CAS for denied claims if not provided
@@ -202,26 +179,9 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
         # MA130 = "Your claim/service(s) has been denied"
         w.segment("MOA", "", "MA130")
 
-    # K3 occurrences: PYMS; SUB/IPAD/USER; SNWK; TRPN-ASPUFE*; DREC/DADJ/PAIDDT
-    if clm.get("payment_status") in ("P","D"): w.segment("K3", f"PYMS-{clm['payment_status']}")
-    if clm.get("subscriber_internal_id") or clm.get("ip_address") or clm.get("user_id"):
-        parts = []
-        if clm.get("subscriber_internal_id"): parts.append(f"SUB-{clm['subscriber_internal_id']}")
-        if clm.get("ip_address"): parts.append(f"IPAD-{clm['ip_address']}")
-        if clm.get("user_id"): parts.append(f"USER-{clm['user_id']}")
-        w.segment("K3", ";".join(parts))
-    if clm.get("rendering_network_indicator"): w.segment("K3", f"SNWK-{clm['rendering_network_indicator']}")
-    if clm.get("submission_channel") in ("ELECTRONIC","PAPER"):
-        tag = "ASPUFEELEC" if clm["submission_channel"]=="ELECTRONIC" else "ASPUFEPAPER"
-        w.segment("K3", f"TRPN-{tag}")
-
-    # K3 - Date tracking (Kaizen requirement: DREC/DADJ/PAIDDT)
-    if clm.get("receipt_date") or clm.get("adjudication_date") or clm.get("paid_date"):
-        date_parts = []
-        if clm.get("receipt_date"): date_parts.append(f"DREC-{_fmt_d8(clm['receipt_date'])}")
-        if clm.get("adjudication_date"): date_parts.append(f"DADJ-{_fmt_d8(clm['adjudication_date'])}")
-        if clm.get("paid_date"): date_parts.append(f"PAIDDT-{_fmt_d8(clm['paid_date'])}")
-        w.segment("K3", ";".join(date_parts))
+    # K3 - Network Indicator (moved here before rendering provider address)
+    if clm.get("rendering_network_indicator"):
+        w.segment("K3", f"SNWK-{clm['rendering_network_indicator']}")
 
     # K3 - Rendering Provider Address (Kaizen requirement: AL1/AL2 and CY/ST/ZIP)
     rend = claim_json.get("rendering_provider", {})
@@ -268,25 +228,31 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             # CR1*unit*weight*transport_reason**transport_code*reason_desc*qty*qty*CR109*CR110
 
             # Format CR109 (pickup location) as single string
+            # Check ambulance object first, then fall back to first service
             cr109 = ""
-            if amb.get("pickup"):
-                pickup = amb["pickup"]
+            pickup_source = amb.get("pickup")
+            if not pickup_source and claim_json.get("services") and claim_json["services"][0].get("pickup"):
+                pickup_source = claim_json["services"][0]["pickup"]
+            if pickup_source:
                 parts = []
-                if pickup.get("addr"): parts.append(pickup["addr"])
-                if pickup.get("city"): parts.append(pickup["city"])
-                if pickup.get("state"): parts.append(pickup["state"])
-                if pickup.get("zip"): parts.append(pickup["zip"])
+                if pickup_source.get("addr"): parts.append(pickup_source["addr"])
+                if pickup_source.get("city"): parts.append(pickup_source["city"])
+                if pickup_source.get("state"): parts.append(pickup_source["state"])
+                if pickup_source.get("zip"): parts.append(pickup_source["zip"])
                 cr109 = ", ".join(parts) if parts else ""
 
             # Format CR110 (dropoff location) as single string
+            # Check ambulance object first, then fall back to first service
             cr110 = ""
-            if amb.get("dropoff"):
-                dropoff = amb["dropoff"]
+            dropoff_source = amb.get("dropoff")
+            if not dropoff_source and claim_json.get("services") and claim_json["services"][0].get("dropoff"):
+                dropoff_source = claim_json["services"][0]["dropoff"]
+            if dropoff_source:
                 parts = []
-                if dropoff.get("addr"): parts.append(dropoff["addr"])
-                if dropoff.get("city"): parts.append(dropoff["city"])
-                if dropoff.get("state"): parts.append(dropoff["state"])
-                if dropoff.get("zip"): parts.append(dropoff["zip"])
+                if dropoff_source.get("addr"): parts.append(dropoff_source["addr"])
+                if dropoff_source.get("city"): parts.append(dropoff_source["city"])
+                if dropoff_source.get("state"): parts.append(dropoff_source["state"])
+                if dropoff_source.get("zip"): parts.append(dropoff_source["zip"])
                 cr110 = ", ".join(parts) if parts else ""
 
             # Build CR1 with 10 elements
@@ -337,6 +303,100 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
             if amb.get("dropoff"):
                 w.segment("NM1", "45", "2"); w.segment("N3", amb["dropoff"].get("addr",""))
                 w.segment("N4", amb["dropoff"].get("city",""), amb["dropoff"].get("state",""), amb["dropoff"].get("zip",""))
+
+    # Phase 3: Additional K3 segments per §2.1.4 and §2.1.14
+
+    # K3*PYMS - Claim-level payment status (P=Paid, D=Denied)
+    payment_status = clm.get("payment_status")
+    if payment_status in ("P", "D"):
+        w.segment("K3", f"PYMS-{payment_status}")
+
+    # K3*SUB - Portal submission tracking (subscriber ID, IP address, user ID)
+    # Per §2.1.14: Required when claim is submitted via web portal
+    portal_parts = []
+    if clm.get("subscriber_internal_id"):
+        portal_parts.append(f"SUB-{clm['subscriber_internal_id']}")
+    if clm.get("ip_address"):
+        portal_parts.append(f"IPAD-{clm['ip_address']}")
+    if clm.get("user_id"):
+        portal_parts.append(f"USER-{clm['user_id']}")
+    if portal_parts:
+        w.segment("K3", ";".join(portal_parts))
+
+    # K3*TRPN - Trip number/submission channel reference (for tracking)
+    # Per Kaizen vendor spec: ASPUFEELEC or ASPUFEPAPER
+    if clm.get("submission_channel") in ("ELECTRONIC", "PAPER"):
+        tag = "ASPUFEELEC" if clm["submission_channel"] == "ELECTRONIC" else "ASPUFEPAPER"
+        w.segment("K3", f"TRPN-{tag}")
+
+    # K3*DREC/DADJ/PAIDDT - Lifecycle dates
+    # Per §2.1.4: Track when claim was received, adjudicated, and paid
+    lifecycle_parts = []
+    # Support both field names for backward compatibility
+    received_date = clm.get("received_date") or clm.get("receipt_date")
+    if received_date:
+        lifecycle_parts.append(f"DREC-{_fmt_d8(received_date)}")
+    if clm.get("adjudication_date"):
+        lifecycle_parts.append(f"DADJ-{_fmt_d8(clm['adjudication_date'])}")
+    if clm.get("paid_date"):
+        lifecycle_parts.append(f"PAIDDT-{_fmt_d8(clm['paid_date'])}")
+    if lifecycle_parts:
+        w.segment("K3", ";".join(lifecycle_parts))
+
+    # Phase 3: DTP segments for lifecycle dates per §2.1.4 and §2.1.7
+
+    # DTP*050 - Received Date (support both field names for backward compatibility)
+    if received_date:
+        w.segment("DTP", "050", "D8", _fmt_d8(received_date))
+
+    # DTP*036 - Adjudication Date
+    if clm.get("adjudication_date"):
+        w.segment("DTP", "036", "D8", _fmt_d8(clm["adjudication_date"]))
+
+    # DTP*573 - Paid Date
+    if clm.get("paid_date"):
+        w.segment("DTP", "573", "D8", _fmt_d8(clm["paid_date"]))
+
+    # Phase 3: AMT segments for financial amounts per §2.1.4 and §2.1.7
+
+    # AMT*B6 - Allowed Amount (support both field names)
+    allowed_amt = clm.get("allowed_amount")
+    if allowed_amt is None:
+        allowed_amt = clm.get("other_payer_allowed_amount")
+    if allowed_amt is not None:
+        w.segment("AMT", "B6", f"{float(allowed_amt):.2f}")
+
+    # AMT*A8 - Not Covered Amount
+    if clm.get("not_covered_amount") is not None:
+        w.segment("AMT", "A8", f"{float(clm['not_covered_amount']):.2f}")
+
+    # AMT*F5 - Patient Paid Amount (support both field names)
+    patient_paid = clm.get("patient_paid_amount")
+    if patient_paid is None:
+        patient_paid = clm.get("patient_amount_paid")
+    if patient_paid is not None:
+        w.segment("AMT", "F5", f"{float(patient_paid):.2f}")
+
+    # AMT*F2 - Patient Responsibility Amount
+    if clm.get("patient_responsibility_amount") is not None:
+        w.segment("AMT", "F2", f"{float(clm['patient_responsibility_amount']):.2f}")
+
+    # COB - Coordination of Benefits Amounts
+
+    # AMT*D - COB Total Non-Covered Amount
+    if clm.get("cob_non_covered") is not None:
+        w.segment("AMT", "D", f"{float(clm['cob_non_covered']):.2f}")
+
+    # AMT*AU - COB Coverage Amount (support both field names)
+    cob_coverage = clm.get("cob_coverage_amount")
+    if cob_coverage is None:
+        cob_coverage = clm.get("other_payer_coverage_amount")
+    if cob_coverage is not None:
+        w.segment("AMT", "AU", f"{float(cob_coverage):.2f}")
+
+    # AMT*EAF - Other Payer Primary/Secondary Amount Paid
+    if clm.get("other_payer_paid_amount") is not None:
+        w.segment("AMT", "EAF", f"{float(clm['other_payer_paid_amount']):.2f}")
 
     # Loop 2310A - Referring Provider (Claim Level)
     # Per §2.1.1: "Referring provider loop should be reported if data is available for the claim"
@@ -517,12 +577,13 @@ def build_837p_from_json(claim_json: dict, cfg: Config, cn: ControlNumbers = Non
                 w.segment("REF", "LU", str(trip_num).zfill(9))
 
         # Loop 2420G - Ambulance Pick-up Location (Service Line Level)
-        if svc.get("pickup"):
+        # NOTE: In CR109/CR110 mode, pickup/dropoff are in CR1 elements 9-10, NOT in separate loops
+        if not cfg.use_cr1_locations and svc.get("pickup"):
             w.segment("NM1", "PW", "2"); w.segment("N3", svc["pickup"].get("addr",""))
             w.segment("N4", svc["pickup"].get("city",""), svc["pickup"].get("state",""), svc["pickup"].get("zip",""))
 
         # Loop 2420H - Ambulance Drop-off Location (Service Line Level)
-        if svc.get("dropoff"):
+        if not cfg.use_cr1_locations and svc.get("dropoff"):
             w.segment("NM1", "45", "2"); w.segment("N3", svc["dropoff"].get("addr",""))
             w.segment("N4", svc["dropoff"].get("city",""), svc["dropoff"].get("state",""), svc["dropoff"].get("zip",""))
 

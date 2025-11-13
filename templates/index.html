@@ -58,6 +58,17 @@
                         </label>
                     </div>
 
+                    <div class="form-group">
+                        <label for="processingMode">Processing Mode:</label>
+                        <select id="processingMode">
+                            <option value="single">Single Claim (Same provider)</option>
+                            <option value="batch">Batch Processing (Multiple providers - auto-split)</option>
+                        </select>
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            💡 Use "Batch Processing" for CSV/JSON files with multiple providers (e.g., Scenario 2)
+                        </small>
+                    </div>
+
                     <div class="button-group">
                         <button id="validateBtn" class="btn btn-secondary">
                             ✓ Validate Only
